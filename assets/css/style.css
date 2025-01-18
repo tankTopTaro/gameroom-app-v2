@@ -222,11 +222,11 @@ html, body {
 }
 
 .heart-broken {
-    animation: growAndFade 0.5s ease forwards;
+    /* animation: growAndFade 0.5s ease forwards; */
 }
 
 .heart-lost {
-    animation: shrinkAndFade 0.5s ease forwards;
+    /* animation: shrinkAndFade 0.5s ease forwards; */
 }
 
 /* Animations */

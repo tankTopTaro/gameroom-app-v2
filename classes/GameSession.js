@@ -107,7 +107,7 @@ class GameSession{
             console.log('preparation starts...');
             this.scoreMultiplier = 1
             this.baseScore = 10
-            this.timeForLevel = 10
+            this.timeForLevel = 60
             this.prepTime = 10
             this.prepCountdown = this.prepTime
             this.countdown = this.timeForLevel
