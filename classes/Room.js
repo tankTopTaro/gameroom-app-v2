@@ -101,8 +101,8 @@ class Room{
     startServer(){
         // Prepare server
         this.server = express();
-        const serverPort = 3001;
-        const serverHostname = 'localhost';
+        const serverPort = process.env.GAME_ROOM_SERVER_PORT || 3001;
+        const serverHostname = process.env.GAME_ROOM_SERVER_HOST || 'localhost';
         // Middleware to set no-cache headers for all routes
         this.server.use((req, res, next) => {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
