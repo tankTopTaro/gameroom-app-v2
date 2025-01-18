@@ -2,6 +2,7 @@ const lifesElement = document.getElementById('lifes')
 const statusElement = document.getElementById('status')
 const countdownElement = document.getElementById('countdown')
 const roomElement = document.getElementById('roomInfo')
+const container = document.getElementById('players')
 const canvas = document.getElementById('canvas1')
 const ctx = canvas.getContext('2d')
 
@@ -180,10 +181,12 @@ function startListenningToSocket(){
             }
             if(json.type === 'newLevelStarts'){
                 let newGame = json
-
+                console.log('newLevelStarts: ', newGame)
                 lifesElement.textContent = newGame.lifes
                 statusElement.textContent = ''
                 roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
+
+                renderPlayerData(newGame.players)
             }
             if(json.type === 'updateCountdown'){
                 let countdown = json.countdown
@@ -245,7 +248,8 @@ function startListenningToSocket(){
             }
             if(json.type === 'playerScored'){
                 let success = json
-
+                console.log('playerScored', success)
+                renderPlayerData(json.players)
                 if (success) {
                     //fetchAudio(success.audio)
                 }
@@ -361,6 +365,8 @@ function resetMonitor() {
     lifesElement.textContent = '5'
     countdownElement.textContent = '00:00'
     statusElement.textContent = ''
+    roomElement.textContent = ''
+    players.innerHTML = ''
 }
 
 function clearDots(x, y, radius) {
@@ -381,6 +387,46 @@ function clearDots(x, y, radius) {
 
     // Restore the original drawing state
     ctx.restore();
+}
+
+function renderPlayerData(playerData){
+    container.innerHTML = ''
+
+    playerData.forEach((player) => {
+        const li = document.createElement('li')
+        li.classList.add('list-item')
+
+        // Create an image element for the avatar
+        const avatarImg = document.createElement('img');
+        avatarImg.src = player.playerAvatar;
+        avatarImg.alt = `${player.playerName || 'Unknown'}'s avatar`;
+        avatarImg.classList.add('avatar');
+
+        // Create a container for players info
+        const playerInfo = document.createElement('div');
+        playerInfo.classList.add('d-flex');
+        playerInfo.classList.add('flex-column');
+        playerInfo.classList.add('align-items-start');
+
+        // Create a span for the player's details
+        const playerDetails = document.createElement('span');
+        playerDetails.textContent = `${player.playerName || 'Unknown'}`;
+
+        // Create a span for the player's score
+        const playerScore = document.createElement('span');
+        playerScore.textContent = `Score: ${player.score}`;
+
+        // Append player details and score to the player info container
+        playerInfo.appendChild(playerDetails);
+        playerInfo.appendChild(playerScore);
+
+        // Append avatar and info to the list item
+        li.appendChild(avatarImg);
+        li.appendChild(playerInfo);
+
+        // Append the list item to the container
+        container.appendChild(li);
+    })
 }
 
 // Erases yellow dots

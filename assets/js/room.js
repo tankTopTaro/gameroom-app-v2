@@ -186,6 +186,12 @@ function startListenningToSocket(){
                     roomMessageContainer.classList.add('d-flex');
                 }
 
+                // Automatically exit the game if there is no interaction for 10 seconds
+                setTimeout(() => {
+                    if(noBtn){
+                        noBtn.click()
+                    }
+                }, 10000)
                 
                 if (continueBtn) {
                     continueBtn.addEventListener('click', () => {
@@ -231,13 +237,6 @@ function startListenningToSocket(){
                         }
                     });
                 }
-                /* setTimeout(() => {
-                    if(noBtn){
-                        noBtn.click()
-                    } else {
-                        console.error('No button found')
-                    }
-                }, 10000) */
             }
             if(json.type === 'gameEnded'){
                 isGameOver = true

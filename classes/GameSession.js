@@ -70,9 +70,8 @@ class GameSession{
             clearInterval(this.blinkInterval);
             this.blinkInterval = undefined
         }
-        this.score = 0
+        this.score = this.room.players.playing[0].score
         this.status = undefined
-        this.room.players.playing = []
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
         this.room.isFree = true
@@ -116,7 +115,6 @@ class GameSession{
             this.lifes = 5
             let message = {
                 'type':'newLevelStarts',
-                'players': this.players,
                 'rule':this.rule,
                 'level':this.level,
                 'countdown':this.countdown,
@@ -627,6 +625,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
+                            'players': this.room.players.playing,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -688,6 +687,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
+                            'players': this.room.players.playing,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -749,6 +749,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
+                            'players': this.room.players.playing,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -802,6 +803,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
+                            'players': this.room.players.playing,
                             'color': clickedLight.color,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
