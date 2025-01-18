@@ -6,6 +6,8 @@ class Socket{
         this.port = port
         this.socket
         this.clients
+        this.messageQueue = [];
+        this.messageResolve = null;
         this.init()
     }
 
@@ -30,6 +32,7 @@ class Socket{
             // Handle incoming messages from the client
             client.on('message', message => {
                 console.log('Socket for '+this.page+' received message from client:', message);
+                this.handleIncomingMessage(message);
             });
         });
 
@@ -44,7 +47,7 @@ class Socket{
         });
     }
 
-    waitForMessage() {
+    /* waitForMessage() {
         return new Promise((resolve, reject) => {
             this.clients.forEach(client => {
                 client.on('message', raw => {
@@ -58,6 +61,52 @@ class Socket{
                 })
             })
         })
+    } */
+
+    handleIncomingMessage(rawMessage) {
+        try {
+            // Convert rawMessage to string if it's not already
+            const messageString = typeof rawMessage === 'string' 
+                ? rawMessage 
+                : rawMessage.toString();
+    
+            // Validate if the message is JSON
+            const isJson = messageString.trim().startsWith('{') || messageString.trim().startsWith('[');
+            if (!isJson) {
+                console.warn('Non-JSON message received:', messageString);
+                return; // Ignore non-JSON messages
+            }
+    
+            // Parse the JSON message
+            const message = JSON.parse(messageString);
+    
+            // Handle the message
+            if (this.messageResolve) {
+                this.messageResolve(message);
+                this.messageResolve = null;
+            } else {
+                this.messageQueue.push(message);
+            }
+        } catch (error) {
+            console.error('Error parsing message:', error, 'Raw message:', rawMessage);
+        }
+    }
+
+    waitForMessage() {
+        if (this.messageQueue.length > 0) {
+            return Promise.resolve(this.messageQueue.shift());
+        }
+
+        return new Promise((resolve) => {
+            this.messageResolve = resolve;
+        });
+    }  
+
+    // Simulate receiving a message
+    simulateMessage(message) {
+        const rawMessage = JSON.stringify(message);
+        console.log(`Simulating message: ${rawMessage}`);
+        this.handleIncomingMessage(rawMessage);
     }
 }
 

@@ -27,10 +27,10 @@ class GameSession{
         this.roomType = roomType
         this.prepTimer = undefined
         this.score = 0
-        this.isGoingToNextLevel = false
         this.isGreenButtonPressed = false
         this.blinkInterval = undefined
         this.isGreen = true
+        this.receivedMessage = undefined
 
         this.status = undefined
         this.rule = Number(rule)
@@ -70,7 +70,9 @@ class GameSession{
             clearInterval(this.blinkInterval);
             this.blinkInterval = undefined
         }
+        this.score = 0
         this.status = undefined
+        this.room.players.playing = []
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
         this.room.isFree = true
@@ -267,6 +269,11 @@ class GameSession{
         }, 1000)
 
         setTimeout(() => {
+            if (this.status === 'running') {
+                console.warn('Game is already running. Ignoring start call.');
+                return; // Prevent multiple starts
+            }
+
             console.log('Starting the Game...');
             this.lastLevelStartedAt = Date.now()
 
@@ -481,14 +488,36 @@ class GameSession{
                 }
             }
 
-            this.animationMetronome = setInterval(() =>{
-                this.updateCountdown()
-                this.updateShapes()
-                this.applyShapesOnLights()
-                this.room.sendLightsInstructionsIfIdle()
-            } , 1000/25)
+            if (this.animationMetronome) {
+                clearInterval(this.animationMetronome);
+            }    
+            
+            if (this.roomType === 'doubleGrid'){
+                console.log('Double Grid')
+                this.animationMetronome = setInterval(() =>{
+                    this.updateCountdown()
+                    this.updateShapes()
+                    this.applyShapesOnLights()
+                    this.room.sendLightsInstructionsIfIdle()
+                } , 1000/25)
+            } else if (this.roomType === 'basketball'){
+                console.log('Basketball Hoops')
+                this.animationMetronome = setInterval(() =>{
+                    this.updateShapes()
+                    this.applyShapesOnLights()
+                    this.room.sendLightsInstructionsIfIdle()
+                } , 1000/25)
 
-            // TODO : PlaySound('321go.mp3') in the room but also sent to monitors via socket
+                const receivedMessage = this.room.socketForRoom.waitForMessage();
+    
+                receivedMessage.then((message) => {
+                    if (message.type === 'colorNamesEnd') {
+                        this.animationMetronome = setInterval(() =>{
+                            this.updateCountdown()
+                        } , 1000/25)
+                    }
+                })
+            }
 
             this.gameStartedAt = Date.now()
             this.status = 'running'
@@ -497,26 +526,29 @@ class GameSession{
     }
 
     startGreenButton(){
-        if(this.blinkInterval){
-            clearInterval(this.blinkInterval);
+        if(this.isWaitingForGreenButton){
+            if(this.blinkInterval){
+                clearInterval(this.blinkInterval);
+            }
+    
+            this.blinkInterval = setInterval(() => {
+                //this.room.lightGroups.wallButtons[0].color = green
+                this.isGreen = !this.isGreen
+                this.room.lightGroups.wallButtons[0].color = this.isGreen ? black : green
+                this.room.sendLightsInstructionsIfIdle()
+                //console.log('TEST: isGreen: '+ this.isGreen)
+            }, 500)
+    
+            this.room.lightGroups.wallButtons.forEach((light, i) => {
+                if(i === 0){
+                    light.onClick = 'report'
+                }
+                else {
+                    light.color = black
+                    light.onClick = 'ignore'
+                }
+            })
         }
-
-        this.blinkInterval = setInterval(() => {
-            this.isGreen = !this.isGreen
-            this.room.lightGroups.wallButtons[0].color = this.isGreen ? black : green
-            this.room.sendLightsInstructionsIfIdle()
-            //console.log('TEST: isGreen: '+ this.isGreen)
-        }, 500)
-
-        this.room.lightGroups.wallButtons.forEach((light, i) => {
-            if(i === 0){
-                light.onClick = 'report'
-            }
-            else {
-                light.color = black
-                light.onClick = 'ignore'
-            }
-        })
     }
 
     handleLightClickAction(lightId, whileColorWas){
@@ -529,278 +561,285 @@ class GameSession{
         if(this.isWaitingForGreenButton){
             console.log('TEST: waiting for green button')
             this.isGreenButtonPressed = true
+
+            let message = {
+                'type': 'greenButtonPressed',
+            }
+    
+            this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+            this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
+            let simulatedMessage = {'type': 'continue'}
+
             if(this.blinkInterval){
                 clearInterval(this.blinkInterval);
             }
-            if(this.isGoingToNextLevel){
-                this.startNextLevelWhenGreenButtonPressed()
-            }
-            this.startSameLevelWhenGreenButtonPressed()
 
-            // Schedule the methods to be triggered again after 10 seconds
-            this.greenButtonTimeout = setTimeout(() => {
-                if (this.isGoingToNextLevel) {
-                    this.startNextLevelWhenGreenButtonPressed();
+            this.room.socketForRoom.simulateMessage(simulatedMessage);
+            return
+        }
+
+        if(this.roomType === 'doubleGrid'){ 
+            this.handleDoubleGridAction(clickedLight, whileColorWas)
+        }
+        else if(this.roomType === 'basketball'){
+            this.handleBasketballAction(clickedLight, whileColorWas)
+        }
+
+    }
+
+    handleDoubleGridAction(clickedLight, whileColorWas){
+        if(this.rule === 1){
+            if(this.level === 1){
+                // Here we expect :
+                // - walking on red => lose a life
+                // - pushing the correct next button => turn it off and play success-sound
+                // - pushing the wrong button => playing fail-sound
+                if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
+                    if(whileColorWas === '255,0,0'){
+                        this.scoreMultiplier = 1
+                        
+                        this.removeLife()
+
+                        this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
+                            'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
+                            'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                    }
                 }
-                this.startSameLevelWhenGreenButtonPressed();
-            }, 10000); // 10 seconds
-        }else{
-            if(this.roomType === 'doubleGrid'){ 
-                if(this.rule === 1){
-                    if(this.level === 1){
-                        // Here we expect :
-                        // - walking on red => lose a life
-                        // - pushing the correct next button => turn it off and play success-sound
-                        // - pushing the wrong button => playing fail-sound
-                        if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
-                            if(whileColorWas === '255,0,0'){
-                                this.scoreMultiplier = 1
-                                
-                                this.removeLife()
-    
-                                this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
-                                    'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
-                                    'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                            }
+                else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
+                    
+                    if(clickedLight.id === this.ligthIdsSequence[0]){
+                        clickedLight.color = black
+                        clickedLight.onClick = 'ignore'
+
+                        this.correctButton()
+
+                        //TODO : room.playSound('success1')
+                        let message = {
+                            'type': 'playerScored',
+                            'audio': 'playerScored',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
                         }
-                        else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
-                            
-                            if(clickedLight.id === this.ligthIdsSequence[0]){
-                                clickedLight.color = black
-                                clickedLight.onClick = 'ignore'
-    
-                                this.correctButton()
-    
-                                //TODO : room.playSound('success1')
-                                let message = {
-                                    'type': 'playerScored',
-                                    'audio': 'playerScored',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-    
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-    
-                                // Remove the completed light ID from the sequence
-                                this.ligthIdsSequence.splice(0, 1);
-    
-                                // Check if the sequence is complete after processing the current button
-                                if (this.ligthIdsSequence.length === 0) {
-                                    setTimeout(() => this.levelCompleted(), 50)
-                                }
-                            } else {
-                                this.scoreMultiplier = 1 
-                                this.removeLife()   
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
+
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
+                        // Remove the completed light ID from the sequence
+                        this.ligthIdsSequence.splice(0, 1);
+
+                        // Check if the sequence is complete after processing the current button
+                        if (this.ligthIdsSequence.length === 0) {
+                            setTimeout(() => this.levelCompleted(), 50)
                         }
-                    }
-                    else if(this.level === 2){
-                        if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
-                            if(whileColorWas === '255,0,0'){
-                                this.scoreMultiplier = 1
-                                
-                                this.removeLife()
-    
-                                this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
-                                    'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
-                                    'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
+                    } else {
+                        this.scoreMultiplier = 1 
+                        this.removeLife()   
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
                         }
-                        else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
-                            if(clickedLight.id === this.ligthIdsSequence[0]){
-                                clickedLight.color = black
-                                clickedLight.onClick = 'ignore'
-    
-                                this.correctButton()
-    
-                                //TODO : room.playSound('success1')
-                                let message = {
-                                    'type': 'playerScored',
-                                    'audio': 'playerScored',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-    
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-    
-                                // Remove the completed light ID from the sequence
-                                this.ligthIdsSequence.splice(0, 1);
-    
-                                // Check if the sequence is complete after processing the current button
-                                if (this.ligthIdsSequence.length === 0) {
-                                    setTimeout(() => this.levelCompleted(), 50)
-                                }
-                            } else {
-                                this.scoreMultiplier = 1   
-                                this.removeLife()   
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
-                        }
-                    }
-                    else if(this.level === 3) {
-                        if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
-                            if(whileColorWas === '255,0,0'){
-                                this.scoreMultiplier = 1
-    
-                                this.removeLife()
-    
-                                this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
-                                    'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
-                                    'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
-                        }
-                        else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
-                            if(clickedLight.id === this.ligthIdsSequence[0]){
-                                clickedLight.color = black
-                                clickedLight.onClick = 'ignore'
-    
-                                this.correctButton()
-    
-                                //TODO : room.playSound('success1')
-                                let message = {
-                                    'type': 'playerScored',
-                                    'audio': 'playerScored',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-    
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                
-                                this.ligthIdsSequence.splice(0, 1)
-                                if(this.ligthIdsSequence.length === 0){
-                                    // this.levelCompleted()
-                                    let message = {
-                                        'type': 'levelCompleted',
-                                        'audio': 'levelCompleted',
-                                        'message': 'Player Wins'
-                                    }
-        
-                                    this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                    this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                    this.endAndExit()   // End the game if its the last level
-                                }
-                            } else {
-                                this.scoreMultiplier = 1    
-                                this.removeLife()   
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
-                        }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                     }
                 }
             }
-            else if(this.roomType === 'basketball'){
-                if(this.rule === 1) {
-                    if(this.level === 1) {
-                        if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
-                            // console.log('CLicked:', this.lightColorSequence[0] === clickedLight.color)
-                            if(clickedLight.color === this.lightColorSequence[0]){
-                                // clickedLight.color = black
-                                // clickedLight.onClick = 'ignore'
-    
-                                this.correctButton()
-    
-                                //TODO : room.playSound('success1')
-                                let message = {
-                                    'type': 'playerScored',
-                                    'audio': 'playerScored',
-                                    'color': clickedLight.color,
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                } 
-            
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-            
-                                this.lightColorSequence.splice(0, 1)
-                                if(this.lightColorSequence.length === 0){
-                                    clearInterval(this.animationMetronome)
-                                    
-                                    let message = { 
-                                        'type': 'levelCompleted',
-                                        'message': 'Player Wins',
-                                        'audio': 'levelCompleted',
-                                    }
-                            
-                                    this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                    this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-    
-                                    this.offerSameLevel() // Loop the game for now  
-                                }
-                            } else {
-                                this.scoreMultiplier = 1    
-                                this.removeLife()   
-    
-                                let message = {
-                                    'type': 'playerFailed',
-                                    'audio': 'playerFailed',
-                                    'color': clickedLight.color,
-                                    'scoreMultiplier': this.scoreMultiplier,
-                                    'playerScore': this.room.players.playing[0].score
-                                }
-                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                            }
+            else if(this.level === 2){
+                if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
+                    if(whileColorWas === '255,0,0'){
+                        this.scoreMultiplier = 1
+                        
+                        this.removeLife()
+
+                        this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
+                            'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
+                            'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
                         }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                    }
+                }
+                else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
+                    if(clickedLight.id === this.ligthIdsSequence[0]){
+                        clickedLight.color = black
+                        clickedLight.onClick = 'ignore'
+
+                        this.correctButton()
+
+                        //TODO : room.playSound('success1')
+                        let message = {
+                            'type': 'playerScored',
+                            'audio': 'playerScored',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
+                        // Remove the completed light ID from the sequence
+                        this.ligthIdsSequence.splice(0, 1);
+
+                        // Check if the sequence is complete after processing the current button
+                        if (this.ligthIdsSequence.length === 0) {
+                            setTimeout(() => this.levelCompleted(), 50)
+                        }
+                    } else {
+                        this.scoreMultiplier = 1   
+                        this.removeLife()   
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                    }
+                }
+            }
+            else if(this.level === 3) {
+                if(this.room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
+                    if(whileColorWas === '255,0,0'){
+                        this.scoreMultiplier = 1
+
+                        this.removeLife()
+
+                        this.shapes.push(new Shape(clickedLight.posX+clickedLight.width/2, clickedLight.posY+clickedLight.height/2,
+                            'rectangle', clickedLight.width/2, clickedLight.height/2, [255,100,0],
+                            'ignore', [{ x: 0, y: 0 }], 0, 'mainFloor', 2000 ))
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                    }
+                }
+                else if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
+                    if(clickedLight.id === this.ligthIdsSequence[0]){
+                        clickedLight.color = black
+                        clickedLight.onClick = 'ignore'
+
+                        this.correctButton()
+
+                        //TODO : room.playSound('success1')
+                        let message = {
+                            'type': 'playerScored',
+                            'audio': 'playerScored',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                        
+                        this.ligthIdsSequence.splice(0, 1)
+                        if(this.ligthIdsSequence.length === 0){
+                            // this.levelCompleted()
+                            let message = {
+                                'type': 'levelCompleted',
+                                'audio': 'levelCompleted',
+                                'message': 'Player Wins'
+                            }
+
+                            this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                            setTimeout(() => this.endAndExit(), 50)   // End the game if its the last level
+                        }
+                    } else {
+                        this.scoreMultiplier = 1    
+                        this.removeLife()   
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                     }
                 }
             }
         }
+    }
 
+    handleBasketballAction(clickedLight, whileColorWas){
+        if(this.rule === 1) {
+            if(this.level === 1) {
+                if(this.room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
+                    // console.log('CLicked:', this.lightColorSequence[0] === clickedLight.color)
+                    if(clickedLight.color === this.lightColorSequence[0]){
+                        // clickedLight.color = black
+                        // clickedLight.onClick = 'ignore'
+
+                        this.correctButton()
+
+                        //TODO : room.playSound('success1')
+                        let message = {
+                            'type': 'playerScored',
+                            'audio': 'playerScored',
+                            'color': clickedLight.color,
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        } 
+    
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+    
+                        this.lightColorSequence.splice(0, 1)
+                        if(this.lightColorSequence.length === 0){
+                            //setTimeout(() => this.levelCompleted(), 50)
+                            let message = {
+                                'type': 'levelCompleted',
+                                'audio': 'levelCompleted',
+                                'message': 'Player Wins'
+                            }
+
+                            this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                            setTimeout(() => this.endAndExit(), 50)  // End the game if its the last level
+                        }
+                    } else {
+                        this.scoreMultiplier = 1    
+                        this.removeLife()   
+
+                        let message = {
+                            'type': 'playerFailed',
+                            'audio': 'playerFailed',
+                            'color': clickedLight.color,
+                            'scoreMultiplier': this.scoreMultiplier,
+                            'playerScore': this.score
+                        }
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                    }
+                }
+            }
+        }
     }
 
     levelCompleted(){
@@ -812,14 +851,17 @@ class GameSession{
         }      
 
         if(this.room.waitingGameSession === undefined){  
-    
             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
 
-            this.offerNextLevel()
+            if(this.roomType === 'basketball'){
+                this.offerSameLevel()
+            } else {
+                this.offerNextLevel()
+            }
+            
         }
         else if(this.levelsStartedWhileSessionIsWaiting < 3){
-    
             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
 
@@ -855,7 +897,6 @@ class GameSession{
     offerSameLevel(){
         this.isWaitingForGreenButton = true
         this.startGreenButton()
-        console.log('offerSameLevel', this.isWaitingForGreenButton)
         // TODO : propose same level with countdown and push a button to accept
         let message = {
             'type': 'offerSameLevel',
@@ -869,7 +910,6 @@ class GameSession{
 
     offerNextLevel(){
         this.isWaitingForGreenButton = true
-        this.isGoingToNextLevel = true
         this.startGreenButton()
         console.log('offerNextLevel', this.isWaitingForGreenButton)
         // TODO : propose next level with countdown and push a button to accept
@@ -883,16 +923,11 @@ class GameSession{
         this.startNextLevel()
     }
 
-    async startSameLevelWhenGreenButtonPressed(){
+   /*  async startNextLevelWhenGreenButtonPressed(){
+        clearInterval(this.animationMetronome)
         this.isWaitingForGreenButton = false
-        console.log(this.isGreenButtonPressed)
 
-        let message = {
-            'type': 'greenButtonPressed',
-        }
-
-        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+        
 
         if(this.room.waitingGameSession !== undefined){
             this.levelsStartedWhileSessionIsWaiting ++
@@ -905,8 +940,8 @@ class GameSession{
     }
 
     async startSameLevelWhenGreenButtonPressed(){
+        clearInterval(this.animationMetronome)
         this.isWaitingForGreenButton = false
-        console.log(this.isGreenButtonPressed)
 
         let message = {
             'type': 'greenButtonPressed',
@@ -919,47 +954,48 @@ class GameSession{
             this.levelsStartedWhileSessionIsWaiting ++
         }
         this.reset()
+        this.isWaitingForGreenButton = false
         this.isGreenButtonPressed = false
         await this.prepare()
         this.start()
-    }
+    } */
 
     async startSameLevel(){
-        const receivedMessage = await this.room.socketForRoom.waitForMessage();
-        console.log('Received:', receivedMessage)
+        this.receivedMessage = await this.room.socketForRoom.waitForMessage();
+        console.log('Received:', this.receivedMessage)
         
         if(this.room.waitingGameSession !== undefined){
             this.levelsStartedWhileSessionIsWaiting ++
         }
 
-        if(receivedMessage.type === 'continue' || this.isGreenButtonPressed){
+        if(this.receivedMessage.type === 'continue'){
             this.reset()
+            this.isWaitingForGreenButton = false
+            this.isGreenButtonPressed = false
             await this.prepare()
             this.start()
         }
-        else if(receivedMessage.type === 'exit'){
+        else if(this.receivedMessage.type === 'exit'){
             this.endAndExit()
         }
     }
 
     async startNextLevel(){
-        const receivedMessage = await this.room.socketForRoom.waitForMessage('');
-        console.log('Received:', receivedMessage)
+        this.receivedMessage = await this.room.socketForRoom.waitForMessage();
+        console.log('Received:', this.receivedMessage)
 
         if(this.room.waitingGameSession !== undefined){
             this.levelsStartedWhileSessionIsWaiting ++
         }
-        if(receivedMessage.type === 'continue' || this.isGreenButtonPressed){
+        if(this.receivedMessage.type === 'continue'){
             this.level ++
             this.reset()
+            this.isWaitingForGreenButton = false
+            this.isGreenButtonPressed = false
             await this.prepare()
             this.start()
         }
-        else if(receivedMessage.type === 'exit'){
-            if(this.doorTimer){
-                clearInterval(this.doorTimer)
-                this.doorTimer = undefined
-            }
+        else if(this.receivedMessage.type === 'exit'){
             this.endAndExit()
         }
         
@@ -987,13 +1023,6 @@ class GameSession{
                 // 'audio': 'PleaseEnter'
             }
             this.room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
-
-            // Move waiting players to playing
-            if (this.room.players.waiting.length > 0) {
-                this.room.players.playing = []
-                this.room.players.playing.push(...this.room.players.waiting);
-                this.room.players.waiting = [];
-            }
 
             // Notify the door to display "Please come in"
             let message = {

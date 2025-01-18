@@ -69,30 +69,18 @@ function startListenningToSocket(){
 
                     // reset the score multiplier
                     scoreMultiplier.textContent = 1
-                    playerScore.textContent = newGame.players[0].score
+                    playerScore.textContent = 0
 
                     // Reset the color sequence colors
                     resetSpanColors()
 
                     // Generate hearts
-                    if(isGameOver) {
-                        setTimeout(() => {
-                            lifesContainer.innerHTML = ''
-                            for (let i = 0; i < newGame.lifes; i++) {
-                                const heart = document.createElement('div');
-                                heart.classList.add('heart');
-                                heart.innerHTML = heartSVG;  // Insert the SVG directly
-                                lifesContainer.appendChild(heart);
-                            }
-                        }, 2000)
-                    } else {
-                        lifesContainer.innerHTML = ''
-                        for (let i = 0; i < newGame.lifes; i++) {
-                            const heart = document.createElement('div');
-                            heart.classList.add('heart');
-                            heart.innerHTML = heartSVG;  // Insert the SVG directly
-                            lifesContainer.appendChild(heart);
-                        }
+                    lifesContainer.innerHTML = ''
+                    for (let i = 0; i < newGame.lifes; i++) {
+                        const heart = document.createElement('div');
+                        heart.classList.add('heart');
+                        heart.innerHTML = heartSVG;  // Insert the SVG directly
+                        lifesContainer.appendChild(heart);
                     }
 
                     // Hide or show color sequence
@@ -187,74 +175,69 @@ function startListenningToSocket(){
                 const roomMessage = document.getElementById('room-message')
                 roomMessage.textContent = json.message
 
-                
+                // Hide the HUD
+                if (hud) {
+                    hud.classList.remove('d-flex')
+                    hud.classList.add('d-none')
+                }
 
-                setTimeout(() => {
-                    // Hide the HUD
-                    if (hud) {
-                        hud.classList.remove('d-flex')
-                        hud.classList.add('d-none')
-                    }
+                if (roomMessageContainer) {
+                    roomMessageContainer.classList.remove('d-none');
+                    roomMessageContainer.classList.add('d-flex');
+                }
 
-                    if (roomMessageContainer) {
-                        roomMessageContainer.classList.remove('d-none');
-                        roomMessageContainer.classList.add('d-flex');
-                    }
-
-                    
-                    if (continueBtn) {
-                        continueBtn.addEventListener('click', () => {
-                            const message = {
-                                'type': 'continue'
-                            };
                 
-                            // Send the message via the socket
-                            socket.send(JSON.stringify(message));
-                
-                            // Hide the room message and show the HUD again
-                            if (roomMessageContainer) {
-                                roomMessageContainer.classList.remove('d-flex');
-                                roomMessageContainer.classList.add('d-none');
-                            }
-                
-                            if (hud) {
-                                hud.classList.remove('d-none');
-                                hud.classList.add('d-flex');
-                            }
-                        });
-                    }
-
-                    
-                    if (noBtn) {
-                        noBtn.addEventListener('click', () => {
-                            const message = {
-                                'type': 'exit'
-                            };
-                
-                            // Send the message via the socket
-                            socket.send(JSON.stringify(message));
-                
-                            // Hide the room message and show the HUD again
-                            if (roomMessageContainer) {
-                                roomMessageContainer.classList.remove('d-flex');
-                                roomMessageContainer.classList.add('d-none');
-                            }
-                
-                            if (hud) {
-                                hud.classList.remove('d-none');
-                                hud.classList.add('d-flex');
-                            }
-                        });
-                    }
-
-                    setTimeout(() => {
-                        if(noBtn){
-                            noBtn.click()
-                        } else {
-                            console.error('No button found')
+                if (continueBtn) {
+                    continueBtn.addEventListener('click', () => {
+                        const message = {
+                            'type': 'continue'
+                        };
+            
+                        // Send the message via the socket
+                        socket.send(JSON.stringify(message));
+            
+                        // Hide the room message and show the HUD again
+                        if (roomMessageContainer) {
+                            roomMessageContainer.classList.remove('d-flex');
+                            roomMessageContainer.classList.add('d-none');
                         }
-                    }, 10000)
-                }, 2000)
+            
+                        if (hud) {
+                            hud.classList.remove('d-none');
+                            hud.classList.add('d-flex');
+                        }
+                    });
+                }
+
+                
+                if (noBtn) {
+                    noBtn.addEventListener('click', () => {
+                        const message = {
+                            'type': 'exit'
+                        };
+                        console.log('Exit game')
+                        // Send the message via the socket
+                        socket.send(JSON.stringify(message));
+            
+                        // Hide the room message and show the HUD again
+                        if (roomMessageContainer) {
+                            roomMessageContainer.classList.remove('d-flex');
+                            roomMessageContainer.classList.add('d-none');
+                        }
+            
+                        if (hud) {
+                            hud.classList.remove('d-none');
+                            hud.classList.add('d-flex');
+                        }
+                    });
+                }
+                /* setTimeout(() => {
+                    if(noBtn){
+                        noBtn.click()
+                    } else {
+                        console.error('No button found')
+                    }
+                }, 10000) */
             }
             if(json.type === 'gameEnded'){
                 isGameOver = true
@@ -310,6 +293,12 @@ function startListenningToSocket(){
                 setColorToSpan(json.color)
                 scoreMultiplier.textContent = json.scoreMultiplier
                 playerScore.textContent = json.playerScore
+            }
+            if(json.type === 'playerFailed'){
+                console.log('Color clicked:', json.color)
+                scoreMultiplier.textContent = '1'   // reset score multiplier display
+                playerScore.textContent = json.playerScore
+                setColorToSpan(json.color)
             }
             if(json.type === 'levelFailed'){
                 let lose = json

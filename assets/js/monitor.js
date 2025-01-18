@@ -181,11 +181,9 @@ function startListenningToSocket(){
             if(json.type === 'newLevelStarts'){
                 let newGame = json
 
-                setTimeout(() => {
-                    lifesElement.textContent = newGame.lifes
-                    statusElement.textContent = ''
-                    roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
-                }, 1000)
+                lifesElement.textContent = newGame.lifes
+                statusElement.textContent = ''
+                roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
             }
             if(json.type === 'updateCountdown'){
                 let countdown = json.countdown
@@ -261,7 +259,6 @@ function startListenningToSocket(){
                 }
 
                 setTimeout(() => {
-                    PrepareRoom()
                     resetMonitor()
                 }, 2000)
             }
@@ -276,7 +273,6 @@ function startListenningToSocket(){
                 }
 
                 setTimeout(() => {
-                    drawRoom()
                     resetMonitor()
                 }, 2000)
             }
@@ -364,7 +360,6 @@ async function fetchAudio(soundName) {
 function resetMonitor() {
     lifesElement.textContent = '5'
     countdownElement.textContent = '00:00'
-    roomElement.textContent = ''
     statusElement.textContent = ''
 }
 
