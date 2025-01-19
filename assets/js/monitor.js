@@ -288,6 +288,7 @@ function startListenningToSocket(){
                 let lifes = json.lifes
                 let audio = json.audio
                 
+                console.log('updateLifes', lifes)
                 if (lifesElement) {
                     lifesElement.textContent = lifes.toString();
                     //fetchAudio(audio)

@@ -159,11 +159,7 @@ class Room{
         });
         this.server.get('/game/request', async (req, res) => {
             console.log('/game/request', req.query);
-            if(this.players.playing.length === 0){
-                // move the players from waiting to playing
-                this.players.playing.push(...this.players.waiting)
-                this.players.waiting = []
-                
+            if(this.players.playing.length === 0){                
                 let message = {
                     'type': 'gameRequest',
                     'message': 'Please enter the room',
@@ -172,6 +168,13 @@ class Room{
                 this.socketForMonitor.broadcastMessage(JSON.stringify(message))
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
             } 
+
+            // move the players from waiting to playing
+            if(this.players.waiting.length > 0){
+                this.players.playing = []   // Clear previous players
+                this.players.playing.push(...this.players.waiting)
+                this.players.waiting = []
+            }
 
             if(this.isFree){
                 this.currentGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
@@ -185,6 +188,7 @@ class Room{
                 }
             }
             else {
+                console.log('Waiting:', this.players.waiting)
                 this.waitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
                 // this.players.playing.push(...this.players.waiting)
                 // this.players.waiting = []

@@ -70,7 +70,7 @@ class GameSession{
             clearInterval(this.blinkInterval);
             this.blinkInterval = undefined
         }
-        this.score = this.room.players.playing[0].score
+        this.score = 0
         this.status = undefined
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
@@ -108,6 +108,12 @@ class GameSession{
             console.log('preparation starts...');
             this.scoreMultiplier = 1
             this.baseScore = 10
+
+            if(this.room.players.playing[0].score > 0){
+                this.score = this.room.players.playing[0].score
+            }
+            
+            this.lastLifeLostAt = 0
             this.timeForLevel = 60
             this.prepTime = 10
             this.prepCountdown = this.prepTime
@@ -925,43 +931,6 @@ class GameSession{
         this.startNextLevel()
     }
 
-   /*  async startNextLevelWhenGreenButtonPressed(){
-        clearInterval(this.animationMetronome)
-        this.isWaitingForGreenButton = false
-
-        
-
-        if(this.room.waitingGameSession !== undefined){
-            this.levelsStartedWhileSessionIsWaiting ++
-        }
-        this.level ++
-        this.reset()
-        this.isGreenButtonPressed = false
-        await this.prepare()
-        this.start()
-    }
-
-    async startSameLevelWhenGreenButtonPressed(){
-        clearInterval(this.animationMetronome)
-        this.isWaitingForGreenButton = false
-
-        let message = {
-            'type': 'greenButtonPressed',
-        }
-
-        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-
-        if(this.room.waitingGameSession !== undefined){
-            this.levelsStartedWhileSessionIsWaiting ++
-        }
-        this.reset()
-        this.isWaitingForGreenButton = false
-        this.isGreenButtonPressed = false
-        await this.prepare()
-        this.start()
-    } */
-
     async startSameLevel(){
         this.receivedMessage = await this.room.socketForRoom.waitForMessage();
         console.log('Received:', this.receivedMessage)
@@ -1103,11 +1072,6 @@ class GameSession{
                 this.updateLifes()
             }
         }
-        else{
-            this.lastLifeLostAt = Date.now()
-            this.lifes--
-            this.updateLifes()
-        }
     }
 
     updateLifes(){
@@ -1123,7 +1087,7 @@ class GameSession{
             }
             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
             this.room.socketForRoom.broadcastMessage(JSON.stringify(gameOverMessage))
-            this.levelFailed()
+            setTimeout(() => this.levelFailed(), 50)
         }
 
         this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1131,7 +1095,7 @@ class GameSession{
     }
 
     correctButton(){
-        this.score += this.baseScore * this.scoreMultiplier
+        this.score += (this.baseScore * this.scoreMultiplier)
         this.scoreMultiplier++
         this.room.players.playing.forEach((player) => {
             player.score = this.score

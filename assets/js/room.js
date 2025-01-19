@@ -55,50 +55,51 @@ function startListenningToSocket(){
         if(json){
             if(json.type === 'newLevelStarts'){
                 const newLevel = () => {
-                    let newGame = json 
-                    console.log('newLevelStarts: ', newGame)
-                    
-
-                    // Show the container
-                    app.classList.remove('d-none')
-                    app.classList.add('d-flex')
-                    hudContainer.classList.remove('d-none')
-                    hudContainer.classList.add('d-flex')
-                    playerMessageContainer.classList.remove('d-flex')
-                    playerMessageContainer.classList.add('d-none')
-
-                    // reset the score multiplier
-                    scoreMultiplier.textContent = 1
-                    playerScore.textContent = 0
-
-                    // Reset the color sequence colors
-                    resetSpanColors()
-
+                    let newGame = json;
+                    console.log('newLevelStarts: ', newGame);
+            
+                    // Hide all containers immediately
+                    app.classList.add('d-none');
+                    hudContainer.classList.add('d-none');
+                    playerMessageContainer.classList.add('d-none');
+                    roomMessageContainer.classList.add('d-none');
+            
+                    // Reset all UI elements
+                    scoreMultiplier.textContent = '1';
+                    playerScore.textContent = '0';
+                    countdownElement.textContent = '00:00';
+                    roomElement.textContent = '';
+                    lifesContainer.innerHTML = '';
+                    resetSpanColors();
+            
+                    // Show new level's data after reset
+                    app.classList.remove('d-none');
+                    hudContainer.classList.remove('d-none');
+                    hudContainer.classList.add('d-flex');
+            
                     // Generate hearts
-                    lifesContainer.innerHTML = ''
                     for (let i = 0; i < newGame.lifes; i++) {
                         const heart = document.createElement('div');
                         heart.classList.add('heart');
-                        heart.innerHTML = heartSVG;  // Insert the SVG directly
+                        heart.innerHTML = heartSVG; // Insert the SVG directly
                         lifesContainer.appendChild(heart);
                     }
-
-                    // Hide or show color sequence
-                    if(newGame.roomType === 'basketball'){
-                        colorSequence.classList.remove('invisible')
-                        colorSequence.classList.add('visible')
+            
+                    // Update room info
+                    roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`;
+            
+                    // Handle color sequence visibility
+                    if (newGame.roomType === 'basketball') {
+                        colorSequence.classList.remove('invisible');
+                        colorSequence.classList.add('visible');
                     } else {
-                        colorSequence.classList.remove('visible')
-                        colorSequence.classList.add('invisible')
+                        colorSequence.classList.remove('visible');
+                        colorSequence.classList.add('invisible');
                     }
-
-                    // Display Room info
-                    roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
-                    
-                }
+                };
 
                 if(isGameOver) {
-                    setTimeout(newLevel, 3000)
+                    setTimeout(newLevel, 50)
                 } else {
                     newLevel()
                 }
@@ -175,23 +176,14 @@ function startListenningToSocket(){
                 const roomMessage = document.getElementById('room-message')
                 roomMessage.textContent = json.message
 
-                // Hide the HUD
-                if (hud) {
-                    hud.classList.remove('d-flex')
-                    hud.classList.add('d-none')
-                }
-
-                if (roomMessageContainer) {
-                    roomMessageContainer.classList.remove('d-none');
-                    roomMessageContainer.classList.add('d-flex');
-                }
+                toggleContainers(true) // Show the room message
 
                 // Automatically exit the game if there is no interaction for 10 seconds
-                setTimeout(() => {
+                /* setTimeout(() => {
                     if(noBtn){
                         noBtn.click()
                     }
-                }, 10000)
+                }, 10000) */
                 
                 if (continueBtn) {
                     continueBtn.addEventListener('click', () => {
@@ -203,15 +195,7 @@ function startListenningToSocket(){
                         socket.send(JSON.stringify(message));
             
                         // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
+                        toggleContainers(false)
                     });
                 }
 
@@ -221,20 +205,12 @@ function startListenningToSocket(){
                         const message = {
                             'type': 'exit'
                         };
-                        console.log('Exit game')
+                        //console.log('Exit game')
                         // Send the message via the socket
                         socket.send(JSON.stringify(message));
             
                         // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
+                        toggleContainers(false)
                     });
                 }
             }
@@ -243,6 +219,8 @@ function startListenningToSocket(){
                 // Hide the HUD
                 hudContainer.classList.remove('d-flex')
                 hudContainer.classList.add('d-none')
+                roomMessageContainer.classList.remove('d-flex')
+                roomMessageContainer.classList.add('d-none')
 
                 // Show the game ended message
                 playerMessageContainer.classList.remove('d-none')
@@ -309,8 +287,7 @@ function startListenningToSocket(){
                 fetchAudio(win.audio)
             }
             if(json.type === 'greenButtonPressed'){
-                roomMessageContainer.classList.remove('d-flex')
-                roomMessageContainer.classList.add('d-none')
+                toggleContainers(false)
             }
         }
 
@@ -340,6 +317,20 @@ function startListenningToSocket(){
             //PrepareRoom()
         }
     });
+}
+
+function toggleContainers(showRoomMessage = false) {
+    if (showRoomMessage) {
+        roomMessageContainer.classList.remove('d-none');
+        roomMessageContainer.classList.add('d-flex');
+        hudContainer.classList.remove('d-flex');
+        hudContainer.classList.add('d-none');
+    } else {
+        hudContainer.classList.remove('d-none');
+        hudContainer.classList.add('d-flex');
+        roomMessageContainer.classList.remove('d-flex');
+        roomMessageContainer.classList.add('d-none');
+    }
 }
 
 async function fetchAudio(soundName) {
