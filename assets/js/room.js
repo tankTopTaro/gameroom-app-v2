@@ -59,8 +59,6 @@ function startListenningToSocket(){
                     console.log('newLevelStarts: ', newGame);
             
                     // Hide all containers immediately
-                    app.classList.add('d-none');
-                    hudContainer.classList.add('d-none');
                     playerMessageContainer.classList.add('d-none');
                     roomMessageContainer.classList.add('d-none');
             
@@ -74,16 +72,19 @@ function startListenningToSocket(){
             
                     // Show new level's data after reset
                     app.classList.remove('d-none');
+                    app.classList.add('d-flex');
                     hudContainer.classList.remove('d-none');
                     hudContainer.classList.add('d-flex');
             
                     // Generate hearts
-                    for (let i = 0; i < newGame.lifes; i++) {
-                        const heart = document.createElement('div');
-                        heart.classList.add('heart');
-                        heart.innerHTML = heartSVG; // Insert the SVG directly
-                        lifesContainer.appendChild(heart);
-                    }
+                    setTimeout(() => {
+                        for (let i = 0; i < newGame.lifes; i++) {
+                            const heart = document.createElement('div');
+                            heart.classList.add('heart');
+                            heart.innerHTML = heartSVG; // Insert the SVG directly
+                            lifesContainer.appendChild(heart);
+                        }
+                    }, 10)
             
                     // Update room info
                     roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`;
@@ -96,13 +97,9 @@ function startListenningToSocket(){
                         colorSequence.classList.remove('visible');
                         colorSequence.classList.add('invisible');
                     }
-                };
-
-                if(isGameOver) {
-                    setTimeout(newLevel, 50)
-                } else {
-                    newLevel()
                 }
+
+                setTimeout(newLevel, 2000)
             }
             if(json.type === 'updatePrepTime'){
                 let countdown = json.prepTime
@@ -240,8 +237,6 @@ function startListenningToSocket(){
                     playerMessage.textContent = ''
                     playerMessageContainer.classList.remove('d-flex')
                     playerMessageContainer.classList.add('d-none')
-                    app.classList.remove('d-flex')
-                    app.classList.add('d-none')
                 }, 3000)
                 resetSpanColors()
             }

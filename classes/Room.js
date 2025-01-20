@@ -15,14 +15,12 @@ class Room{
     constructor(roomType) {
         //this.gameManager = new GameManager(this, roomType)
         this.type = roomType
-        this.players = {
-            playing: [],
-            waiting: []
-        }
+        this.players = []
         this.isFree = true;
         this.server = undefined
         this.currentGameSession = undefined
-        this.waitingGameSession = undefined // the one waiting at the door
+        // this.waitingGameSession = undefined // the one waiting at the door
+        this.waitingGameSession = []
         this.width
         this.height // understand this a 2d room plan
         this.created_at = Date.now()
@@ -127,13 +125,13 @@ class Room{
 
             const playerData = { id, playerName, playerAvatar, score: 0 };
 
-            if(this.players.waiting.length < 6){
-                this.players.waiting.push(playerData)
+            if(this.players.length < 6){
+                this.players.push(playerData)
             } else {
                 let message = {
                     'type': 'scannedRfid',
                     'message': 'Room is full',
-                    'players': this.players.waiting
+                    'players': this.players
                 }
 
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
@@ -141,7 +139,7 @@ class Room{
             }
             let message = {
                 'type': 'scannedRfid',
-                'playerData': this.players.waiting,
+                'playerData': this.players,
                 'roomData': this.type
             }
             this.socketForDoor.broadcastMessage(JSON.stringify(message))
@@ -159,7 +157,7 @@ class Room{
         });
         this.server.get('/game/request', async (req, res) => {
             console.log('/game/request', req.query);
-            if(this.players.playing.length === 0){                
+            if(this.players.length === 0){                
                 let message = {
                     'type': 'gameRequest',
                     'message': 'Please enter the room',
@@ -169,15 +167,10 @@ class Room{
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
             } 
 
-            // move the players from waiting to playing
-            if(this.players.waiting.length > 0){
-                this.players.playing = []   // Clear previous players
-                this.players.playing.push(...this.players.waiting)
-                this.players.waiting = []
-            }
-
             if(this.isFree){
                 this.currentGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
+                this.currentGameSession.players = [...this.players]   // this should lock the players to this session
+                this.players = []
                 let gameSessionInitialized = await this.currentGameSession.init()
                 if(gameSessionInitialized === true){
                     console.log('Playing:', this.players.playing)
@@ -188,10 +181,22 @@ class Room{
                 }
             }
             else {
-                console.log('Waiting:', this.players.waiting)
-                this.waitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
+                // waitingGameSession will use FIFO
+                const newWaitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
+                newWaitingGameSession.players = [...this.players]
+                this.waitingGameSession.push(newWaitingGameSession)
+
+                let message = {
+                    'type': 'gameRequest',
+                    'message': 'Please wait',
+                    'players': this.players
+                }
+
+                this.socketForDoor.broadcastMessage(JSON.stringify(message))
+                // console.log('Waiting:', this.players.waiting)
+                // this.waitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
                 // this.players.playing.push(...this.players.waiting)
-                // this.players.waiting = []
+                this.players = []
                 res.send('<html><body><h1>Please wait</h1></body></html>');
             }
         });

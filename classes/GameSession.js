@@ -31,6 +31,7 @@ class GameSession{
         this.blinkInterval = undefined
         this.isGreen = true
         this.receivedMessage = undefined
+        this.players = [] // Players assigned to this game session
 
         this.status = undefined
         this.rule = Number(rule)
@@ -70,10 +71,12 @@ class GameSession{
             clearInterval(this.blinkInterval);
             this.blinkInterval = undefined
         }
+        this.players = []
         this.score = 0
         this.status = undefined
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
+        this.lastLevelStartedAt = undefined
         this.room.isFree = true
         this.room.lights.forEach(light => {
             light.color = black
@@ -109,8 +112,8 @@ class GameSession{
             this.scoreMultiplier = 1
             this.baseScore = 10
 
-            if(this.room.players.playing[0].score > 0){
-                this.score = this.room.players.playing[0].score
+            if(this.players.score > 0){
+                this.score = this.players.score
             }
             
             this.lastLifeLostAt = 0
@@ -126,7 +129,7 @@ class GameSession{
                 'countdown':this.countdown,
                 'lifes':this.lifes,
                 'roomType': this.roomType,
-                'players':this.room.players.playing
+                'players':this.players
             }
             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
@@ -631,7 +634,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
-                            'players': this.room.players.playing,
+                            'players': this.players,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -693,7 +696,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
-                            'players': this.room.players.playing,
+                            'players': this.players,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -755,7 +758,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
-                            'players': this.room.players.playing,
+                            'players': this.players,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
                         }
@@ -809,7 +812,7 @@ class GameSession{
                         let message = {
                             'type': 'playerScored',
                             'audio': 'playerScored',
-                            'players': this.room.players.playing,
+                            'players': this.players,
                             'color': clickedLight.color,
                             'scoreMultiplier': this.scoreMultiplier,
                             'playerScore': this.score
@@ -981,12 +984,18 @@ class GameSession{
         }
         this.room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
         this.room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
+
+        // // Remove players associated to this session
+        // this.room.players = this.room.players.filter(
+        //     (player) => !this.players.includes(player)
+        // );
         
         this.reset()
-        if(this.room.waitingGameSession !== undefined){
+        /* if(this.room.waitingGameSession !== undefined){
             //this.currentGameSession = { ...this.room.waitingGameSession }
-            this.room.currentGameSession = this.room.waitingGameSession
-            this.room.waitingGameSession = undefined
+            //this.room.currentGameSession = this.room.waitingGameSession
+            //this.room.waitingGameSession = undefined
+            //this.room.waitingGameSession = this.room.waitingGameSession.shift();
 
             let messageForDoor = {
                 'type': 'gameEnded',
@@ -1004,7 +1013,27 @@ class GameSession{
             this.room.socketForDoor.broadcastMessage(JSON.stringify(message));
             // TODO display "Please come in" on the door screen
             await this.room.currentGameSession.init()
-        }
+        } */
+       if(this.room.waitingGameSession.length > 0){
+           this.room.currentGameSession = this.room.waitingGameSession.shift();
+           let messageForDoor = {
+                'type': 'gameEnded',
+                'message': 'Please enter the room',
+                // 'audio': 'PleaseEnter'
+            }
+            this.room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
+
+            // Notify the door to display "Please come in"
+            let message = {
+                'type': 'gameRequest',
+                'message': 'Please come in',
+                'players': this.room.players
+            };
+            this.room.socketForDoor.broadcastMessage(JSON.stringify(message));
+            // TODO display "Please come in" on the door screen
+            await this.room.currentGameSession.init()
+       }
+        console.log('Waiting Game sessions: ', this.room.waitingGameSession)
     }
 
     GetLightById(lightId){
@@ -1038,7 +1067,7 @@ class GameSession{
     }
 
     updateCountdown(){
-        if (this.status === undefined) {
+        if (this.status === undefined || this.lastLevelStartedAt === undefined) {
             return;
         }
 
@@ -1097,7 +1126,7 @@ class GameSession{
     correctButton(){
         this.score += (this.baseScore * this.scoreMultiplier)
         this.scoreMultiplier++
-        this.room.players.playing.forEach((player) => {
+        this.players.forEach((player) => {
             player.score = this.score
         })
     }

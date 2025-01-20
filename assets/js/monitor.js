@@ -261,10 +261,6 @@ function startListenningToSocket(){
                     statusElement.textContent = win.message
                     //fetchAudio(win.audio)
                 }
-
-                setTimeout(() => {
-                    resetMonitor()
-                }, 2000)
             }
             if(json.type === 'levelFailed'){
                 let lose = json
@@ -275,10 +271,6 @@ function startListenningToSocket(){
                     
                     //fetchAudio(lose.audio)
                 }
-
-                setTimeout(() => {
-                    resetMonitor()
-                }, 2000)
             }
             if(json.type === 'gameEnded'){
                 resetMonitor()
@@ -427,6 +419,8 @@ function renderPlayerData(playerData){
 
         // Append the list item to the container
         container.appendChild(li);
+
+        container.offsetHeight; // Force reflow
     })
 }
 
