@@ -408,6 +408,10 @@ function setColorToSpan(color) {
             resetSpanColors();
             spans[0].style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
         }
+
+        // Update localStorage with the new span colors
+        const spanColors = Array.from(spans).map(span => span.style.backgroundColor);
+        localStorage.setItem('spanColors', JSON.stringify(spanColors));
     }
 }
 
@@ -425,6 +429,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const storedUpdatePrepTime = JSON.parse(localStorage.getItem('updatePrepTime'));
     const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'));
     const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
+    const storedColors = localStorage.getItem('spanColors')
 
     if (storedNewLevelStarts) {
         console.log('storedNewLevelStarts: ', storedNewLevelStarts)
@@ -480,6 +485,16 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('storedPlayerScored: ', storedPlayerScored) 
         scoreMultiplier.textContent = storedPlayerScored.scoreMultiplier
         playerScore.textContent = storedPlayerScored.playerScore
+    }
+
+    if (storedColors) {
+        const spanColors = JSON.parse(storedColors);
+        const spans = colorSequence.querySelectorAll('span');
+        spanColors.forEach((color, index) => {
+            if (color && spans[index]) {
+                spans[index].style.backgroundColor = color;
+            }
+        });
     }
 })
 

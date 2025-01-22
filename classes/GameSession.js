@@ -552,10 +552,11 @@ class GameSession{
                 this.room.sendLightsInstructionsIfIdle()
             }, 500)
 
-            this.room.lightGroups['mainFloor'].forEach((light) => {
+            // the code block below should only be run when room type is doubleGrid
+            /* this.room.lightGroups['mainFloor'].forEach((light) => {
                 light.color = black
                 light.onClick = 'ignore'
-            })
+            }) */
     
             this.room.lightGroups.wallButtons.forEach((light, i) => {
                 if(i === 0){
