@@ -19,8 +19,7 @@ class Room{
         this.isFree = true;
         this.server = undefined
         this.currentGameSession = undefined
-        // this.waitingGameSession = undefined // the one waiting at the door
-        this.waitingGameSession = []
+        this.waitingGameSession = undefined // the one waiting at the door
         this.width
         this.height // understand this a 2d room plan
         this.created_at = Date.now()
@@ -123,20 +122,25 @@ class Room{
             const { id } = req.params;
             const { playerName, playerAvatar } = req.body;
 
-            const playerData = { id, playerName, playerAvatar, score: 0 };
-
-            if(this.players.length < 6){
-                this.players.push(playerData)
-            } else {
+            if(this.waitingGameSession !== undefined) {
                 let message = {
-                    'type': 'scannedRfid',
-                    'message': 'Room is full',
-                    'players': this.players
+                    'type': 'waitingGameSession',
+                    'message': 'Please wait for a moment'
                 }
 
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
                 this.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
+                return res.json({
+                    message: 'A game session is currently waiting. Player scan is blocked.'
+                })
             }
+
+            const playerData = { id, playerName, playerAvatar, score: 0 };
+
+            if(this.players.length < 6){
+                this.players.push(playerData)
+            } 
             let message = {
                 'type': 'scannedRfid',
                 'playerData': this.players,
@@ -157,15 +161,13 @@ class Room{
         });
         this.server.get('/game/request', async (req, res) => {
             console.log('/game/request', req.query);
-            if(this.players.length === 0){                
-                let message = {
-                    'type': 'gameRequest',
-                    'message': 'Please enter the room',
-                    'players': this.players
-                }
-                this.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                this.socketForDoor.broadcastMessage(JSON.stringify(message))
-            } 
+            let message = {
+                'type': 'gameRequest',
+                'message': 'Please enter the room',
+                'players': this.players
+            }
+            this.socketForMonitor.broadcastMessage(JSON.stringify(message))
+            this.socketForDoor.broadcastMessage(JSON.stringify(message))
 
             if(this.isFree){
                 this.currentGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
@@ -173,7 +175,7 @@ class Room{
                 this.players = []
                 let gameSessionInitialized = await this.currentGameSession.init()
                 if(gameSessionInitialized === true){
-                    console.log('Playing:', this.players.playing)
+                    //console.log('Playing:', this.players.playing)
                     res.send('<html><body><h1>Please enter the room</h1></body></html>');    
                 }
                 else{
@@ -181,21 +183,16 @@ class Room{
                 }
             }
             else {
-                // waitingGameSession will use FIFO
-                const newWaitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
-                newWaitingGameSession.players = [...this.players]
-                this.waitingGameSession.push(newWaitingGameSession)
+                this.waitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
+                this.waitingGameSession.players = [...this.players]
 
                 let message = {
                     'type': 'gameRequest',
-                    'message': 'Please wait',
+                    'message': 'Please wait for a moment',
                     'players': this.players
                 }
 
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
-                // console.log('Waiting:', this.players.waiting)
-                // this.waitingGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
-                // this.players.playing.push(...this.players.waiting)
                 this.players = []
                 res.send('<html><body><h1>Please wait</h1></body></html>');
             }
@@ -249,9 +246,6 @@ class Room{
             console.log(`Simulate an RFID scan: http://${serverHostname}:${serverPort}/test-rfid`);
         });
     }
-
-
-
 
     sendLightsInstructionsIfIdle(){
 

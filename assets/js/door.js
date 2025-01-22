@@ -28,7 +28,7 @@ function startListenningToSocket(){
         }
         if(json){
             if(json.type === 'scannedRfid'){
-                console.log(json)
+                localStorage.setItem('scannedRfid', JSON.stringify(json))
                 if(json.players && Array.isArray(json.players) && json.players.length === 6){
                     // Clear previous message
                     doorMessage.innerHTML = ''
@@ -49,9 +49,32 @@ function startListenningToSocket(){
                         doorMessage.innerHTML = ''
                         doorMessage.classList.remove('d-flex')
                         doorMessage.classList.add('d-none')
-                    }, 2000)
+                    }, 5000)
                 }
                 renderDoor(json)
+            }
+            if(json.type === 'waitingGameSession'){
+                console.log(json)
+                // Clear previous message
+                doorMessage.innerHTML = ''
+
+                // Add new message
+                const message = document.createElement('h1')
+                message.classList.add('text-white')
+                message.classList.add('text-center')
+                message.textContent = json.message
+                doorMessage.appendChild(message)
+
+                // Ensure visibility
+                doorMessage.classList.remove('d-none');
+                doorMessage.classList.add('d-flex');
+
+                // Clear message after 5 seconds
+                setTimeout(() => {
+                    doorMessage.innerHTML = ''
+                    doorMessage.classList.remove('d-flex')
+                    doorMessage.classList.add('d-none')
+                }, 5000)
             }
             if(json.type === 'gameRequest'){
                 console.log(json)
@@ -76,9 +99,6 @@ function startListenningToSocket(){
                     doorMessage.classList.remove('d-flex')
                     doorMessage.classList.add('d-none')
                 }, 5000)
-            }
-            if(json.type === 'roomIsBusy'){
-                console.log(json)
             }
             if(json.type === 'gameEnded'){
                 console.log(json.message)
@@ -231,7 +251,6 @@ function handleLevelSelection(event){
     selectedLevelBtn.classList.add('btn-danger');
     startGameBtn.classList.remove('disabled');
     startGameBtn.innerHTML = rocket;
-
 }
 
 levelButtons.forEach((button) => {
@@ -263,6 +282,7 @@ async function submitRoomConfig(rule, level){
 
         if (response.ok) {
             console.log('Room configuration submitted successfully.')
+            localStorage.removeItem('scannedRfid')
         } else {
             console.error('Failed to submit room configuration.')
         }
@@ -271,5 +291,13 @@ async function submitRoomConfig(rule, level){
     }   
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    const savedRfid = JSON.parse(localStorage.getItem('scannedRfid'))
+
+    if(savedRfid){
+        console.log('Scanned rfid: ', savedRfid)
+        renderDoor(savedRfid)
+    }
+})
 
 startListenningToSocket()

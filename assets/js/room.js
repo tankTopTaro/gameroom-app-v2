@@ -15,6 +15,8 @@ const noBtn = document.getElementById('no-button')
 const playerMessageContainer = document.getElementById('player-message-container')
 const playerMessage = document.getElementById('player-message')
 
+const hearts = lifesContainer.querySelectorAll('.heart')
+
 const heartSVG = `<svg id="heart" xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
@@ -54,52 +56,37 @@ function startListenningToSocket(){
         }
         if(json){
             if(json.type === 'newLevelStarts'){
-                const newLevel = () => {
-                    let newGame = json;
-                    console.log('newLevelStarts: ', newGame);
-            
+                let newGame = json;
+
+                if(isGameOver){
+                    setTimeout(() => {
+                        // Hide all containers immediately
+                        playerMessageContainer.classList.add('d-none');
+                        roomMessageContainer.classList.add('d-none');
+
+                        // Show new level's data after reset
+                        app.classList.remove('d-none');
+                        app.classList.add('d-flex');
+                        hudContainer.classList.remove('d-none');
+                        hudContainer.classList.add('d-flex');
+
+                        renderNewGame(newGame)
+                    }, 5000)
+                    isGameOver = false
+                } else {
                     // Hide all containers immediately
                     playerMessageContainer.classList.add('d-none');
                     roomMessageContainer.classList.add('d-none');
-            
-                    // Reset all UI elements
-                    scoreMultiplier.textContent = '1';
-                    playerScore.textContent = '0';
-                    countdownElement.textContent = '00:00';
-                    roomElement.textContent = '';
-                    lifesContainer.innerHTML = '';
-                    resetSpanColors();
-            
+
                     // Show new level's data after reset
                     app.classList.remove('d-none');
                     app.classList.add('d-flex');
                     hudContainer.classList.remove('d-none');
                     hudContainer.classList.add('d-flex');
-            
-                    // Generate hearts
-                    setTimeout(() => {
-                        for (let i = 0; i < newGame.lifes; i++) {
-                            const heart = document.createElement('div');
-                            heart.classList.add('heart');
-                            heart.innerHTML = heartSVG; // Insert the SVG directly
-                            lifesContainer.appendChild(heart);
-                        }
-                    }, 10)
-            
-                    // Update room info
-                    roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`;
-            
-                    // Handle color sequence visibility
-                    if (newGame.roomType === 'basketball') {
-                        colorSequence.classList.remove('invisible');
-                        colorSequence.classList.add('visible');
-                    } else {
-                        colorSequence.classList.remove('visible');
-                        colorSequence.classList.add('invisible');
-                    }
-                }
 
-                setTimeout(newLevel, 2000)
+                    renderNewGame(newGame)
+                }
+                
             }
             if(json.type === 'updatePrepTime'){
                 let countdown = json.prepTime
@@ -109,9 +96,7 @@ function startListenningToSocket(){
                 minutes = minutes < 10 ? '0' + minutes : minutes
                 seconds = seconds < 10 ? '0' + seconds : seconds
 
-                if(countdown <= 60){
-                    countdownElement.textContent = `${minutes}:${seconds}`
-                }
+                countdownElement.textContent = `${minutes}:${seconds}`
 
                 if(countdown === 3){
                     fetchAudio(json.audio)
@@ -125,16 +110,17 @@ function startListenningToSocket(){
                 minutes = minutes < 10 ? '0' + minutes : minutes
                 seconds = seconds < 10 ? '0' + seconds : seconds
 
-                if(countdown <= 60){
-                    countdownElement.textContent = `${minutes}:${seconds}`
+                let countdownText = `${minutes}:${seconds}`
+
+                if(countdown < 60){
+                    countdownElement.textContent = countdownText
                 }
             }
             if(json.type === 'updateLifes'){
                 let lifes = json.lifes
                 fetchAudio(json.audio)
-                console.log('Updating lifes to:', lifes)
 
-                const hearts = lifesContainer.querySelectorAll('.heart')
+                console.log('Updating lifes to:', lifes)                
 
                 // Remove extra hearts and replace with heartbreaks
                 if (hearts.length > lifes) {
@@ -148,6 +134,7 @@ function startListenningToSocket(){
 
                         // Add animation to the heart disappearing
                         heart.classList.add('heart-lost');
+
                         setTimeout(() => {
                             // Replace heart with heartbreak at the same position
                             if (lifesContainer.contains(heart)) {
@@ -159,9 +146,9 @@ function startListenningToSocket(){
             }
             if(json.type === 'noMoreLifes') {
                 isGameOver = true
-                setTimeout(() => {
+                /* setTimeout(() => {
                     lifesContainer.innerHTML = ''
-                }, 2000)
+                }, 2000) */
                 
             }
             if(json.type === 'offerSameLevel' || 
@@ -175,15 +162,12 @@ function startListenningToSocket(){
 
                 toggleContainers(true) // Show the room message
 
-                // Automatically exit the game if there is no interaction for 10 seconds
-                /* setTimeout(() => {
-                    if(noBtn){
-                        noBtn.click()
-                    }
-                }, 10000) */
+                let timeoutId;
                 
                 if (continueBtn) {
                     continueBtn.addEventListener('click', () => {
+                        clearTimeout(timeoutId);
+
                         const message = {
                             'type': 'continue'
                         };
@@ -199,10 +183,11 @@ function startListenningToSocket(){
                 
                 if (noBtn) {
                     noBtn.addEventListener('click', () => {
+                        clearTimeout(timeoutId);
+
                         const message = {
                             'type': 'exit'
                         };
-                        //console.log('Exit game')
                         // Send the message via the socket
                         socket.send(JSON.stringify(message));
             
@@ -210,8 +195,17 @@ function startListenningToSocket(){
                         toggleContainers(false)
                     });
                 }
+
+                timeoutId = setTimeout(() => {
+                    const message = {
+                        'type': 'exit'
+                    };
+                    // Send the message via the socket
+                    socket.send(JSON.stringify(message));
+                }, 10000)
             }
             if(json.type === 'gameEnded'){
+                console.log(json)
                 isGameOver = true
                 // Hide the HUD
                 hudContainer.classList.remove('d-flex')
@@ -226,7 +220,7 @@ function startListenningToSocket(){
 
                 // Reset the displays
                 roomElement.textContent = ''
-                lifesContainer.innerHTML = ''
+                //lifesContainer.innerHTML = ''
                 countdownElement.textContent = '00:00'
                 scoreMultiplier.textContent = '1'
                 playerScore.textContent = '0'
@@ -237,8 +231,10 @@ function startListenningToSocket(){
                     playerMessage.textContent = ''
                     playerMessageContainer.classList.remove('d-flex')
                     playerMessageContainer.classList.add('d-none')
-                }, 3000)
-                resetSpanColors()
+
+                    resetSpanColors()
+                }, 5000)
+                
             }
             if(json.type === 'colorNames'){
                 let color = json
@@ -314,6 +310,44 @@ function startListenningToSocket(){
     });
 }
 
+function renderNewGame(data) {
+    console.log('newLevelStarts: ', data);
+
+    // Reset all UI elements
+    scoreMultiplier.textContent = '1';
+    playerScore.textContent = '0';
+    countdownElement.textContent = '00:00';
+    roomElement.textContent = '';
+    resetSpanColors();
+
+    const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'))
+
+    if(storedUpdateLifes){
+        console.log('storedUpdateLifes: ', storedUpdateLifes)
+    } else {
+        // Generate hearts
+        setTimeout(() => {
+            for (let i = 0; i < data.lifes; i++) {
+                const heart = hearts[i]
+                heart.innerHTML = heartSVG; // Insert the SVG directly
+            }
+        }, 10)
+    }
+
+    // Update room info
+    roomElement.textContent = `Rule ${data.rule} Level ${data.level}`;
+    playerScore.textContent = data.players[0].score;
+
+    // Handle color sequence visibility
+    if (data.roomType === 'basketball') {
+        colorSequence.classList.remove('invisible');
+        colorSequence.classList.add('visible');
+    } else {
+        colorSequence.classList.remove('visible');
+        colorSequence.classList.add('invisible');
+    }
+}
+
 function toggleContainers(showRoomMessage = false) {
     if (showRoomMessage) {
         roomMessageContainer.classList.remove('d-none');
@@ -358,21 +392,22 @@ async function fetchAudio(soundName) {
 function setColorToSpan(color) {
     const spans = colorSequence.querySelectorAll('span');
 
-    if(spans.length > 0 && color){
-        const allSpansFilled = Array.from(spans).every(span => span.style.backgroundColor);
-
-        // Reset all spans if all are filled
-        if (allSpansFilled) {
-            resetSpanColors();
-        }
-        
+    if (spans.length > 0 && color) {
         const [r, g, b] = color;
 
-        console.log('r', r, 'g', g, 'b', b)
+        console.log('r', r, 'g', g, 'b', b);
 
-        spans[currentSpanIndex].style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        // Find the first empty span (one without a background color)
+        const emptySpan = Array.from(spans).find(span => !span.style.backgroundColor);
 
-        currentSpanIndex = (currentSpanIndex + 1) % spans.length;
+        if (emptySpan) {
+            // Set the color for the first empty span
+            emptySpan.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        } else {
+            // If all spans are filled, reset them and use the first span
+            resetSpanColors();
+            spans[0].style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        }
     }
 }
 
@@ -383,6 +418,70 @@ function resetSpanColors() {
     });
     currentSpanIndex = 0; // Reset the index if you want to start from the first span
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    const storedNewLevelStarts = JSON.parse(localStorage.getItem('newLevelStarts'));
+    const storedUpdateCountdown = JSON.parse(localStorage.getItem('updateCountdown'));
+    const storedUpdatePrepTime = JSON.parse(localStorage.getItem('updatePrepTime'));
+    const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'));
+    const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
+
+    if (storedNewLevelStarts) {
+        console.log('storedNewLevelStarts: ', storedNewLevelStarts)
+        // Hide all containers immediately
+        playerMessageContainer.classList.add('d-none');
+        roomMessageContainer.classList.add('d-none');
+
+        // Show new level's data after reset
+        app.classList.remove('d-none');
+        app.classList.add('d-flex');
+        hudContainer.classList.remove('d-none');
+        hudContainer.classList.add('d-flex');
+
+        renderNewGame(storedNewLevelStarts)
+    }
+
+    if (storedUpdateCountdown) {
+        console.log('storedUpdateCountdown: ', storedUpdateCountdown)
+        countdownElement.textContent = storedUpdateCountdown
+    }
+
+    if (storedUpdatePrepTime) {
+        console.log('storedUpdatePrepTime: ', storedUpdatePrepTime)
+        countdownElement.textContent = storedUpdatePrepTime
+    }
+
+    if (storedUpdateLifes) {
+        console.log('storedUpdateLifes: ', storedUpdateLifes)
+
+        for (let i = 0; i < storedUpdateLifes; i++) {
+            const heart = hearts[i]
+            heart.innerHTML = heartSVG; // Insert the SVG directly
+        }
+        // Remove extra hearts and replace with heartbreaks
+        if (hearts.length > storedUpdateLifes) {
+            for (let i = storedUpdateLifes; i < hearts.length; i++) {
+                const heart = hearts[i];
+
+                // Create the heartbreak element
+                const heartbreak = document.createElement('div');
+                heartbreak.classList.add('heart-broken');
+                heartbreak.innerHTML = heartbreakSVG;
+
+                // Replace heart with heartbreak at the same position
+                if (lifesContainer.contains(heart)) {
+                    lifesContainer.replaceChild(heartbreak, heart);
+                }
+            }
+        }
+    }
+
+    if (storedPlayerScored) {
+        console.log('storedPlayerScored: ', storedPlayerScored) 
+        scoreMultiplier.textContent = storedPlayerScored.scoreMultiplier
+        playerScore.textContent = storedPlayerScored.playerScore
+    }
+})
 
 startListenningToSocket()
 

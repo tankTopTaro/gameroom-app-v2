@@ -15,6 +15,7 @@ let lightsAreDrawn = false
 let bufferedLightUpdates = []
 let yellowDots = []
 let audioQueue = []
+let clearDotsInterval = undefined
 
 // Give the canvas good size to avoid the default size of 300px which then streches and pixellizes
 
@@ -181,6 +182,12 @@ function startListenningToSocket(){
             }
             if(json.type === 'newLevelStarts'){
                 let newGame = json
+                if(newGame){
+                    localStorage.clear()
+                }
+
+                localStorage.setItem('newLevelStarts', JSON.stringify(json))
+                
                 console.log('newLevelStarts: ', newGame)
                 lifesElement.textContent = newGame.lifes
                 statusElement.textContent = ''
@@ -196,8 +203,28 @@ function startListenningToSocket(){
                 minutes = minutes < 10 ? '0' + minutes : minutes
                 seconds = seconds < 10 ? '0' + seconds : seconds
 
-                if(countdown < 61){
-                    countdownElement.textContent = `${minutes}:${seconds}`
+                let countdownText = `${minutes}:${seconds}`
+                
+                localStorage.setItem('updateCountdown', JSON.stringify(countdownText))
+
+                if(countdown < 60){
+                    countdownElement.textContent = countdownText
+                }
+            }
+            if(json.type === 'updateLifes'){
+                let lifes = json.lifes
+
+                localStorage.setItem('updateLifes', JSON.stringify(lifes))
+                //let audio = json.audio
+                
+                console.log('updateLifes', lifes)
+                if (lifesElement) {
+                    lifesElement.textContent = lifes.toString();
+                    //fetchAudio(audio)
+                }
+                
+                if(lifes === 0){
+                    resetMonitor()
                 }
             }
             if(json.type === 'updatePrepTime'){
@@ -208,9 +235,11 @@ function startListenningToSocket(){
                 minutes = minutes < 10 ? '0' + minutes : minutes
                 seconds = seconds < 10 ? '0' + seconds : seconds
 
-                if(countdown < 61){
-                    countdownElement.textContent = `${minutes}:${seconds}`
-                }
+                let prepTimeText = `${minutes}:${seconds}`
+                
+                localStorage.setItem('updatePrepTime', JSON.stringify(prepTimeText))
+                countdownElement.textContent = prepTimeText
+
                 if(json.prepTime === 3){
                     //fetchAudio(json.audio)
                 }
@@ -248,6 +277,9 @@ function startListenningToSocket(){
             }
             if(json.type === 'playerScored'){
                 let success = json
+
+                localStorage.setItem('playerScored', JSON.stringify(success))
+
                 console.log('playerScored', success)
                 renderPlayerData(json.players)
                 if (success) {
@@ -257,39 +289,40 @@ function startListenningToSocket(){
             if(json.type === 'levelCompleted'){
                 let win = json
 
-                if(statusElement){
-                    statusElement.textContent = win.message
-                    //fetchAudio(win.audio)
-                }
+                statusElement.textContent = win.message
+                //fetchAudio(win.audio)
+
+                setTimeout(() => {
+                    statusElement.textContent = ''
+                    lifesElement.textContent = '5'
+                    countdownElement.textContent = '00:00'
+                }, 3000) 
             }
             if(json.type === 'levelFailed'){
                 let lose = json
 
-                console.log('levelFailed')
-                if(statusElement){
-                    statusElement.textContent = lose.message
-                    
-                    //fetchAudio(lose.audio)
-                }
+                statusElement.textContent = lose.message
+                //fetchAudio(lose.audio)
+
+                setTimeout(() => {
+                    statusElement.textContent = ''
+                    lifesElement.textContent = '5'
+                    countdownElement.textContent = '00:00'
+                }, 3000)
             }
             if(json.type === 'gameEnded'){
+                /* if(clearDotsInterval){
+                    clearInterval(clearDotsInterval);
+                    clearDotsInterval = undefined
+                } */
                 resetMonitor()
-                PrepareRoom()
+                localStorage.clear()
             }
-            if(json.type === 'updateLifes'){
-                let lifes = json.lifes
-                let audio = json.audio
-                
-                console.log('updateLifes', lifes)
-                if (lifesElement) {
-                    lifesElement.textContent = lifes.toString();
-                    //fetchAudio(audio)
-                }
-                
-                if(lifes === 0){
-                    resetMonitor()
-                }
+            if(json.type === 'greenButtonPressed'){
+                const message = {'type': 'continue'};
+                socket.send(JSON.stringify(message))
             }
+            
             if(json.type === 'offerSameLevel'){}
             if(json.type === 'offerNextLevel'){}
             if(json.type === 'timeIsUp'){}
@@ -407,7 +440,14 @@ function renderPlayerData(playerData){
 
         // Create a span for the player's score
         const playerScore = document.createElement('span');
+        const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
+
+        if(storedPlayerScored){
+            playerScore.textContent = `Score: ${storedPlayerScored.playerScore}`
+        }
+
         playerScore.textContent = `Score: ${player.score}`;
+        
 
         // Append player details and score to the player info container
         playerInfo.appendChild(playerDetails);
@@ -425,13 +465,58 @@ function renderPlayerData(playerData){
 }
 
 // Erases yellow dots
-setInterval(() => {
+function clearAndDrawRoom() {
     yellowDots.forEach((dot) => {
         clearDots( dot.x, dot.y, dot.radius)
     })
     yellowDots = []
     drawRoom()
-}, 4000)
+}
+
+// Clear dots
+if(clearDotsInterval){
+    clearInterval(clearDotsInterval)
+}
+
+clearDotsInterval = setInterval(clearAndDrawRoom, 4000)
+
+window.addEventListener('DOMContentLoaded', () => {
+    const storedNewLevelStarts = JSON.parse(localStorage.getItem('newLevelStarts'));
+    const storedUpdateCountdown = JSON.parse(localStorage.getItem('updateCountdown'));
+    const storedUpdatePrepTime = JSON.parse(localStorage.getItem('updatePrepTime'));
+    const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'));
+    const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
+
+    if (storedNewLevelStarts) {
+        console.log('storedNewLevelStarts: ', storedNewLevelStarts)
+        lifesElement.textContent = storedNewLevelStarts.lifes
+        statusElement.textContent = ''
+        roomElement.textContent = 'Room: ' + storedNewLevelStarts.roomType + ' Rule: ' + storedNewLevelStarts.rule + ' Level: ' + storedNewLevelStarts.level
+
+        renderPlayerData(storedNewLevelStarts.players)
+    }
+
+    if (storedUpdateCountdown) {
+        console.log('storedUpdateCountdown: ', storedUpdateCountdown)
+        countdownElement.textContent = storedUpdateCountdown
+    }
+
+    if (storedUpdatePrepTime) {
+        console.log('storedUpdatePrepTime: ', storedUpdatePrepTime)
+        countdownElement.textContent = storedUpdatePrepTime
+    }
+
+    if (storedUpdateLifes) {
+        console.log('storedUpdateLifes: ', storedUpdateLifes)
+        lifesElement.textContent = storedUpdateLifes
+    }
+
+    if (storedPlayerScored) {
+        console.log('storedPlayerScored: ', storedPlayerScored)   
+        renderPlayerData(storedPlayerScored.players)     
+    }
+})
+
 
 lightsAreDrawn = false
 startListenningToSocket()

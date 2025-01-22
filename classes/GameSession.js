@@ -28,6 +28,7 @@ class GameSession{
         this.prepTimer = undefined
         this.score = 0
         this.isGreenButtonPressed = false
+        this.isWaitingForGreenButton = false
         this.blinkInterval = undefined
         this.isGreen = true
         this.receivedMessage = undefined
@@ -57,7 +58,7 @@ class GameSession{
             .catch((e) => {
                 console.log('CATCH: prepareAndGreet() failed')
                 console.log(e)
-                this.currentGameSession = undefined
+                this.room.currentGameSession = undefined
                 console.log('Game session cancelled.')
                 console.log('Room remains free.')
                 result = e
@@ -71,13 +72,14 @@ class GameSession{
             clearInterval(this.blinkInterval);
             this.blinkInterval = undefined
         }
-        this.players = []
-        this.score = 0
+        if(this.animationMetronome){
+            clearInterval(this.animationMetronome);
+            this.animationMetronome = undefined
+        }
+
         this.status = undefined
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
-        this.lastLevelStartedAt = undefined
-        this.room.isFree = true
         this.room.lights.forEach(light => {
             light.color = black
             light.onClick = 'ignore'
@@ -118,7 +120,7 @@ class GameSession{
             
             this.lastLifeLostAt = 0
             this.timeForLevel = 60
-            this.prepTime = 10
+            this.prepTime = 15
             this.prepCountdown = this.prepTime
             this.countdown = this.timeForLevel
             this.lifes = 5
@@ -138,6 +140,7 @@ class GameSession{
                 try{
                     await this.prepareShapes()
                     clearInterval(this.prepTimer)
+                    clearInterval(this.animationMetronome)
                     console.log('preparation ends...');
                     this.status = 'prepared'
                     resolve(true);
@@ -280,256 +283,261 @@ class GameSession{
                 console.warn('Game is already running. Ignoring start call.');
                 return; // Prevent multiple starts
             }
-
+    
             console.log('Starting the Game...');
             this.lastLevelStartedAt = Date.now()
 
-            if(this.roomType === 'doubleGrid'){          
-                if(this.rule === 1){                
-                    if(this.level === 1){                                  
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
-                        }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        
-                        // Generates an array of numbers, shuffles it, and returns the shuffled sequence.
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-    
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-    
-                        this.ligthIdsSequence = []
-    
-                        this.room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-    
-                        this.room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-    
-                        this.ligthIdsSequence.splice(0, 1)
-    
-                    }
-                    else if(this.level === 2){
-                        // TODO: refactor this as it duplicates the code from level 1
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
-                        }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-    
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-    
-                        this.ligthIdsSequence = []
-    
-                        this.room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-                        this.room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-                        this.ligthIdsSequence.splice(0, 1)
-    
-                    }
-                    else if(this.level === 3){
-                        // TODO: refactor this as it duplicates the code from level 1
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
-                        }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-    
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-    
-                        this.ligthIdsSequence = []
-    
-                        this.room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-                        this.room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-                        this.ligthIdsSequence.splice(0, 1)
-                    }
-                }
-            } 
-            else if(this.roomType === 'basketball'){
-                if(this.rule === 1){
-                    if(this.level === 1){
-                        const colors = [
-                            [255,0,0],    // red
-                            [0,255,0],    // green
-                            [0,0,255],    // blue
-                            [255,255,0],  // yellow
-                            [255,0,255]   // purple
-                        ];
-    
-                        function getColorName(rgb) {
-                            const colorNames = {
-                                '255,0,0': 'red',
-                                '0,255,0': 'green',
-                                '0,0,255': 'blue',
-                                '255,255,0': 'yellow',
-                                '255,0,255': 'purple'
-                            }
-    
-                            return colorNames[rgb.join(',')]
-                        }
-                        
-                        // Generate a random color sequence
-                        function makeColorSequence(size) {
-                            return Array.from({ length: size }, () => Math.floor(Math.random() * colors.length));
-                        }
-                        
-                        // Shuffle an array
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = Math.floor(Math.random() * (i + 1));
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                            return array;
-                        }
-                        
-                        const colorsSequence = makeColorSequence(3).map(i => colors[i]);
-    
-                        console.log('Color sequence:', colorsSequence);
-    
-                        // Play sounds according to what is in the sequence
-                        
-                        this.lightColorSequence = new Array(colorsSequence.length).fill(null);
-    
-                        let currentColorIndex = 0;
-    
-                        const showColorSequence = setInterval(() => {
-                            const currentColor = colorsSequence[currentColorIndex]
-                            console.log(currentColor)
-    
-                            const colorName = getColorName(currentColor)
-    
-                            console.log('Showing color: ', colorName)
-    
-                            let message = {
-                                'type': 'colorNames',
-                                'name': colorName
-                            }
-    
-                            this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                            this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-    
-                            this.room.lightGroups.wallButtons.forEach((light) => {
-                                light.color = colorsSequence[currentColorIndex];
-                            });
-                            
-                            currentColorIndex++;
-    
-                            if (currentColorIndex >= colorsSequence.length) {
-                                setTimeout(() => {
-                                    clearInterval(showColorSequence);
-                                    
-                                    // TODO: Add another interval to change the shuffled colors after 3 seconds
-                                    const shuffledColors = shuffleArray([...colors]);
-                                    this.room.lightGroups.wallButtons.forEach((light, i) => {
-                                        light.color = shuffledColors[i]
-                                    })
-                                    let message = {
-                                        'type': 'colorNamesEnd',
-                                    }
-                                    this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
-                                    this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                }, 1000)
-                            }
-                        }, 1000)
-    
-                        this.room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.onClick = 'report';
-                            this.lightColorSequence[i] = colorsSequence[i % colorsSequence.length];
-                        }); 
-    
-                        this.lightColorSequence.length = colorsSequence.length;
-                    }
-                }
-            }
-
-            if (this.animationMetronome) {
-                clearInterval(this.animationMetronome);
-            }    
+            this.startGame()
             
-            if (this.roomType === 'doubleGrid'){
-                console.log('Double Grid')
-                this.animationMetronome = setInterval(() =>{
-                    this.updateCountdown()
-                    this.updateShapes()
-                    this.applyShapesOnLights()
-                    this.room.sendLightsInstructionsIfIdle()
-                } , 1000/25)
-            } else if (this.roomType === 'basketball'){
-                console.log('Basketball Hoops')
-                this.animationMetronome = setInterval(() =>{
-                    this.updateShapes()
-                    this.applyShapesOnLights()
-                    this.room.sendLightsInstructionsIfIdle()
-                } , 1000/25)
-
-                const receivedMessage = this.room.socketForRoom.waitForMessage();
-    
-                receivedMessage.then((message) => {
-                    if (message.type === 'colorNamesEnd') {
-                        this.animationMetronome = setInterval(() =>{
-                            this.updateCountdown()
-                        } , 1000/25)
-                    }
-                })
-            }
-
-            this.gameStartedAt = Date.now()
-            this.status = 'running'
-            console.log('GameSession Started.');
         }, this.prepTime * 1000)
+    }
+
+    startGame(){
+        if(this.roomType === 'doubleGrid'){          
+            if(this.rule === 1){                
+                if(this.level === 1){                                  
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
+                    }
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                    }
+                    
+                    // Generates an array of numbers, shuffles it, and returns the shuffled sequence.
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
+                        }
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
+                    }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    this.room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+
+                    this.room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+
+                    this.ligthIdsSequence.splice(0, 1)
+
+                }
+                else if(this.level === 2){
+                    // TODO: refactor this as it duplicates the code from level 1
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
+                    }
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                    }
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
+                        }
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
+                    }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    this.room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+                    this.room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+                    this.ligthIdsSequence.splice(0, 1)
+
+                }
+                else if(this.level === 3){
+                    // TODO: refactor this as it duplicates the code from level 1
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
+                    }
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                    }
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
+                        }
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
+                    }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    this.room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+                    this.room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+                    this.ligthIdsSequence.splice(0, 1)
+                }
+            }
+        } 
+        else if(this.roomType === 'basketball'){
+            if(this.rule === 1){
+                if(this.level === 1){
+                    const colors = [
+                        [255,0,0],    // red
+                        [0,255,0],    // green
+                        [0,0,255],    // blue
+                        [255,255,0],  // yellow
+                        [255,0,255]   // purple
+                    ];
+
+                    function getColorName(rgb) {
+                        const colorNames = {
+                            '255,0,0': 'red',
+                            '0,255,0': 'green',
+                            '0,0,255': 'blue',
+                            '255,255,0': 'yellow',
+                            '255,0,255': 'purple'
+                        }
+
+                        return colorNames[rgb.join(',')]
+                    }
+                    
+                    // Generate a random color sequence
+                    function makeColorSequence(size) {
+                        return Array.from({ length: size }, () => Math.floor(Math.random() * colors.length));
+                    }
+                    
+                    // Shuffle an array
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                        return array;
+                    }
+                    
+                    const colorsSequence = makeColorSequence(3).map(i => colors[i]);
+
+                    console.log('Color sequence:', colorsSequence);
+
+                    // Play sounds according to what is in the sequence
+                    
+                    this.lightColorSequence = new Array(colorsSequence.length).fill(null);
+
+                    let currentColorIndex = 0;
+
+                    const showColorSequence = setInterval(() => {
+                        const currentColor = colorsSequence[currentColorIndex]
+                        console.log(currentColor)
+
+                        const colorName = getColorName(currentColor)
+
+                        console.log('Showing color: ', colorName)
+
+                        let message = {
+                            'type': 'colorNames',
+                            'name': colorName
+                        }
+
+                        this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
+                        this.room.lightGroups.wallButtons.forEach((light) => {
+                            light.color = colorsSequence[currentColorIndex];
+                        });
+                        
+                        currentColorIndex++;
+
+                        if (currentColorIndex >= colorsSequence.length) {
+                            setTimeout(() => {
+                                clearInterval(showColorSequence);
+                                
+                                // TODO: Add another interval to change the shuffled colors after 3 seconds
+                                const shuffledColors = shuffleArray([...colors]);
+                                this.room.lightGroups.wallButtons.forEach((light, i) => {
+                                    light.color = shuffledColors[i]
+                                })
+                                let message = {
+                                    'type': 'colorNamesEnd',
+                                }
+                                this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                                this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                            }, 1000)
+                        }
+                    }, 1000)
+
+                    this.room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.onClick = 'report';
+                        this.lightColorSequence[i] = colorsSequence[i % colorsSequence.length];
+                    }); 
+
+                    this.lightColorSequence.length = colorsSequence.length;
+                }
+            }
+        }
+
+        if (this.animationMetronome) {
+            clearInterval(this.animationMetronome);
+        }    
+        
+        if (this.roomType === 'doubleGrid'){
+            console.log('Double Grid')
+            this.animationMetronome = setInterval(() =>{
+                this.updateCountdown()
+                this.updateShapes()
+                this.applyShapesOnLights()
+                this.room.sendLightsInstructionsIfIdle()
+            } , 1000/25)
+        } else if (this.roomType === 'basketball'){
+            console.log('Basketball Hoops')
+            this.animationMetronome = setInterval(() =>{
+                this.updateShapes()
+                this.applyShapesOnLights()
+                this.room.sendLightsInstructionsIfIdle()
+            } , 1000/25)
+
+            const receivedMessage = this.room.socketForRoom.waitForMessage();
+
+            receivedMessage.then((message) => {
+                if (message.type === 'colorNamesEnd') {
+                    this.animationMetronome = setInterval(() =>{
+                        this.updateCountdown()
+                    } , 1000/25)
+                }
+            })
+        }
+
+        this.gameStartedAt = Date.now()
+        this.status = 'running'
+        console.log('GameSession Started.');
     }
 
     startGreenButton(){
@@ -539,12 +547,15 @@ class GameSession{
             }
     
             this.blinkInterval = setInterval(() => {
-                //this.room.lightGroups.wallButtons[0].color = green
                 this.isGreen = !this.isGreen
                 this.room.lightGroups.wallButtons[0].color = this.isGreen ? black : green
                 this.room.sendLightsInstructionsIfIdle()
-                //console.log('TEST: isGreen: '+ this.isGreen)
             }, 500)
+
+            this.room.lightGroups['mainFloor'].forEach((light) => {
+                light.color = black
+                light.onClick = 'ignore'
+            })
     
             this.room.lightGroups.wallButtons.forEach((light, i) => {
                 if(i === 0){
@@ -556,6 +567,8 @@ class GameSession{
                 }
             })
         }
+
+        this.isGreenButtonPressed = false
     }
 
     handleLightClickAction(lightId, whileColorWas){
@@ -565,9 +578,8 @@ class GameSession{
         let clickedLight = this.GetLightById(lightId)
         console.log('TEST: clickedLight '+lightId+' whileColorWas: '+ whileColorWas)
 
-        if(this.isWaitingForGreenButton){
-            console.log('TEST: waiting for green button')
-            this.isGreenButtonPressed = true
+        if(this.isWaitingForGreenButton && !this.isGreenButtonPressed){
+            console.log('TEST: waiting for green button', this.isWaitingForGreenButton)
 
             let message = {
                 'type': 'greenButtonPressed',
@@ -576,13 +588,12 @@ class GameSession{
             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
-            let simulatedMessage = {'type': 'continue'}
+            this.isGreenButtonPressed = true
+            this.isWaitingForGreenButton = false
 
             if(this.blinkInterval){
                 clearInterval(this.blinkInterval);
             }
-
-            this.room.socketForRoom.simulateMessage(simulatedMessage);
             return
         }
 
@@ -778,6 +789,7 @@ class GameSession{
                             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
                             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                             setTimeout(() => this.endAndExit(), 50)   // End the game if its the last level
+                            this.room.isFree = true
                         }
                     } else {
                         this.scoreMultiplier = 1    
@@ -833,6 +845,7 @@ class GameSession{
                             this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
                             this.room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                             setTimeout(() => this.endAndExit(), 50)  // End the game if its the last level
+                            this.room.isFree = true
                         }
                     } else {
                         this.scoreMultiplier = 1    
@@ -898,8 +911,10 @@ class GameSession{
         
         if(this.room.waitingGameSession === undefined){         
             this.offerSameLevel()
+            console.log('offerSameLevel')
         }
         else{
+            console.log('endAndExit')
             this.endAndExit()
         }
 
@@ -908,6 +923,7 @@ class GameSession{
     offerSameLevel(){
         this.isWaitingForGreenButton = true
         this.startGreenButton()
+
         // TODO : propose same level with countdown and push a button to accept
         let message = {
             'type': 'offerSameLevel',
@@ -922,7 +938,8 @@ class GameSession{
     offerNextLevel(){
         this.isWaitingForGreenButton = true
         this.startGreenButton()
-        console.log('offerNextLevel', this.isWaitingForGreenButton)
+
+        //console.log('offerNextLevel', this.isWaitingForGreenButton)
         // TODO : propose next level with countdown and push a button to accept
         let message = {
             'type': 'offerNextLevel',
@@ -935,44 +952,86 @@ class GameSession{
     }
 
     async startSameLevel(){
-        this.receivedMessage = await this.room.socketForRoom.waitForMessage();
-        console.log('Received:', this.receivedMessage)
-        
-        if(this.room.waitingGameSession !== undefined){
-            this.levelsStartedWhileSessionIsWaiting ++
-        }
+        // Ensure this function doesn't execute if already in progress
+        if (!this.isWaitingForGreenButton || this.isGreenButtonPressed) return;
 
-        if(this.receivedMessage.type === 'continue'){
+        const roomMessage = this.room.socketForRoom.waitForMessage()
+            .catch((error) => {
+                console.error('Error from socketForRoom:', error)
+                return null;
+            })
+
+        const monitorMessage = this.room.socketForMonitor.waitForMessage()
+            .catch((error) => {
+                console.error('Error from socketForRoom:', error)
+                return null;
+            })
+
+        const message = await Promise.race([
+            roomMessage,
+            monitorMessage
+        ])
+        
+        this.receivedMessage = message
+
+        console.log('Received:', this.receivedMessage)
+    
+        if (this.room.waitingGameSession !== undefined) {
+            this.levelsStartedWhileSessionIsWaiting++
+        }
+    
+        if (this.receivedMessage.type === 'continue') {
             this.reset()
-            this.isWaitingForGreenButton = false
+    
             this.isGreenButtonPressed = false
+    
             await this.prepare()
             this.start()
-        }
-        else if(this.receivedMessage.type === 'exit'){
+        } else if (this.receivedMessage.type === 'exit') {
             this.endAndExit()
         }
     }
 
     async startNextLevel(){
-        this.receivedMessage = await this.room.socketForRoom.waitForMessage();
-        console.log('Received:', this.receivedMessage)
+        // Ensure this function doesn't execute if already in progress
+        if (!this.isWaitingForGreenButton || this.isGreenButtonPressed) return;
 
-        if(this.room.waitingGameSession !== undefined){
-            this.levelsStartedWhileSessionIsWaiting ++
+        const roomMessage = this.room.socketForRoom.waitForMessage()
+            .catch((error) => {
+                console.error('Error from socketForRoom:', error)
+                return null;
+            })
+
+        const monitorMessage = this.room.socketForMonitor.waitForMessage()
+            .catch((error) => {
+                console.error('Error from socketForRoom:', error)
+                return null;
+            })
+
+        const message = await Promise.race([
+            roomMessage,
+            monitorMessage
+        ])
+        
+        this.receivedMessage = message
+
+        console.log('Received:', this.receivedMessage)
+    
+        if (this.room.waitingGameSession !== undefined) {
+            this.levelsStartedWhileSessionIsWaiting++
         }
-        if(this.receivedMessage.type === 'continue'){
-            this.level ++
+    
+        if (this.receivedMessage.type === 'continue') {
+            this.level++
             this.reset()
-            this.isWaitingForGreenButton = false
+    
             this.isGreenButtonPressed = false
+    
             await this.prepare()
             this.start()
-        }
-        else if(this.receivedMessage.type === 'exit'){
+        } else if (this.receivedMessage.type === 'exit') {
             this.endAndExit()
         }
-        
     }
 
     async endAndExit(){
@@ -984,56 +1043,23 @@ class GameSession{
         }
         this.room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
         this.room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
-
-        // // Remove players associated to this session
-        // this.room.players = this.room.players.filter(
-        //     (player) => !this.players.includes(player)
-        // );
         
         this.reset()
-        /* if(this.room.waitingGameSession !== undefined){
-            //this.currentGameSession = { ...this.room.waitingGameSession }
-            //this.room.currentGameSession = this.room.waitingGameSession
-            //this.room.waitingGameSession = undefined
-            //this.room.waitingGameSession = this.room.waitingGameSession.shift();
-
-            let messageForDoor = {
-                'type': 'gameEnded',
-                'message': 'Please enter the room',
-                // 'audio': 'PleaseEnter'
-            }
-            this.room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
+        this.room.isFree = true
+       if(this.room.waitingGameSession !== undefined){
+            this.room.currentGameSession = this.room.waitingGameSession
+            this.room.waitingGameSession = undefined
 
             // Notify the door to display "Please come in"
             let message = {
                 'type': 'gameRequest',
-                'message': 'Please come in',
-                'players': this.room.players
-            };
-            this.room.socketForDoor.broadcastMessage(JSON.stringify(message));
-            // TODO display "Please come in" on the door screen
-            await this.room.currentGameSession.init()
-        } */
-       if(this.room.waitingGameSession.length > 0){
-           this.room.currentGameSession = this.room.waitingGameSession.shift();
-           let messageForDoor = {
-                'type': 'gameEnded',
                 'message': 'Please enter the room',
-                // 'audio': 'PleaseEnter'
-            }
-            this.room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
-
-            // Notify the door to display "Please come in"
-            let message = {
-                'type': 'gameRequest',
-                'message': 'Please come in',
                 'players': this.room.players
             };
             this.room.socketForDoor.broadcastMessage(JSON.stringify(message));
-            // TODO display "Please come in" on the door screen
             await this.room.currentGameSession.init()
-       }
-        console.log('Waiting Game sessions: ', this.room.waitingGameSession)
+        }
+        //console.log('Waiting Game sessions: ', this.room.waitingGameSession)
     }
 
     GetLightById(lightId){
@@ -1067,7 +1093,7 @@ class GameSession{
     }
 
     updateCountdown(){
-        if (this.status === undefined || this.lastLevelStartedAt === undefined) {
+        if (this.status === undefined) {
             return;
         }
 
