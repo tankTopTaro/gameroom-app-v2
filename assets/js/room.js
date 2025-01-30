@@ -15,8 +15,6 @@ const noBtn = document.getElementById('no-button')
 const playerMessageContainer = document.getElementById('player-message-container')
 const playerMessage = document.getElementById('player-message')
 
-const hearts = lifesContainer.querySelectorAll('.heart')
-
 const heartSVG = `<svg id="heart" xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
@@ -70,8 +68,10 @@ function startListenningToSocket(){
                         hudContainer.classList.remove('d-none');
                         hudContainer.classList.add('d-flex');
 
+                        lifesContainer.innerHTML = '';
+
                         renderNewGame(newGame)
-                    }, 5000)
+                    }, 2000)
                     isGameOver = false
                 } else {
                     // Hide all containers immediately
@@ -83,6 +83,8 @@ function startListenningToSocket(){
                     app.classList.add('d-flex');
                     hudContainer.classList.remove('d-none');
                     hudContainer.classList.add('d-flex');
+
+                    lifesContainer.innerHTML = '';
 
                     renderNewGame(newGame)
                 }
@@ -120,7 +122,8 @@ function startListenningToSocket(){
                 let lifes = json.lifes
                 fetchAudio(json.audio)
 
-                console.log('Updating lifes to:', lifes)                
+                console.log('Updating lifes to:', lifes) 
+                const hearts = lifesContainer.querySelectorAll('.heart')               
 
                 // Remove extra hearts and replace with heartbreaks
                 if (hearts.length > lifes) {
@@ -140,6 +143,13 @@ function startListenningToSocket(){
                             if (lifesContainer.contains(heart)) {
                                 lifesContainer.replaceChild(heartbreak, heart);
                             }
+
+                            const heartsState = Array.from(lifesContainer.children).map(heart => {
+                                return heart.classList.contains('heart-broken') ? 'broken' : 'full'
+                            })
+            
+                            localStorage.setItem('updateLifesState', JSON.stringify(heartsState))
+
                         }, 500); // Match the animation duration
                     }
                 }
@@ -153,9 +163,9 @@ function startListenningToSocket(){
             }
             if(json.type === 'offerSameLevel' || 
                 json.type === 'offerNextLevel'){
-                console.log(json.message)
-                // hide the hud then show the message
-                const hud = document.querySelector('.hud');
+                /**
+                 * Remove Buttons from HUD, only the physical room button or the button in monitor will be used for interaction 
+                 */
                 
                 const roomMessage = document.getElementById('room-message')
                 roomMessage.textContent = json.message
@@ -164,7 +174,7 @@ function startListenningToSocket(){
 
                 let timeoutId;
                 
-                if (continueBtn) {
+                /* if (continueBtn) {
                     continueBtn.addEventListener('click', () => {
                         clearTimeout(timeoutId);
 
@@ -194,7 +204,7 @@ function startListenningToSocket(){
                         // Hide the room message and show the HUD again
                         toggleContainers(false)
                     });
-                }
+                } */
 
                 timeoutId = setTimeout(() => {
                     const message = {
@@ -207,6 +217,7 @@ function startListenningToSocket(){
             if(json.type === 'gameEnded'){
                 console.log(json)
                 isGameOver = true
+
                 // Hide the HUD
                 hudContainer.classList.remove('d-flex')
                 hudContainer.classList.add('d-none')
@@ -220,10 +231,10 @@ function startListenningToSocket(){
 
                 // Reset the displays
                 roomElement.textContent = ''
-                //lifesContainer.innerHTML = ''
                 countdownElement.textContent = '00:00'
                 scoreMultiplier.textContent = '1'
                 playerScore.textContent = '0'
+                lifesContainer.innerHTML = ''
 
                 // Hide the HUD after 3 seconds
                 setTimeout(() => {
@@ -234,7 +245,6 @@ function startListenningToSocket(){
 
                     resetSpanColors()
                 }, 5000)
-                
             }
             if(json.type === 'colorNames'){
                 let color = json
@@ -275,6 +285,8 @@ function startListenningToSocket(){
             }
             if(json.type === 'levelCompleted'){
                 let win = json
+                isGameOver = true
+                lifesContainer.innerHTML = '';
                 fetchAudio(win.audio)
             }
             if(json.type === 'greenButtonPressed'){
@@ -318,6 +330,7 @@ function renderNewGame(data) {
     playerScore.textContent = '0';
     countdownElement.textContent = '00:00';
     roomElement.textContent = '';
+    
     resetSpanColors();
 
     const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'))
@@ -326,17 +339,21 @@ function renderNewGame(data) {
         console.log('storedUpdateLifes: ', storedUpdateLifes)
     } else {
         // Generate hearts
-        setTimeout(() => {
-            for (let i = 0; i < data.lifes; i++) {
-                const heart = hearts[i]
-                heart.innerHTML = heartSVG; // Insert the SVG directly
-            }
-        }, 10)
+        console.log('No stored state found, generating new hearts.');
+        for (let i = 0; i < data.lifes; i++) {
+            const heart = document.createElement('div');
+            heart.classList.add('heart');
+            heart.innerHTML = heartSVG; // Insert the SVG directly
+            lifesContainer.appendChild(heart);
+        }
     }
 
     // Update room info
     roomElement.textContent = `Rule ${data.rule} Level ${data.level}`;
     playerScore.textContent = data.players[0].score;
+
+    // Show players
+    renderPlayerData(data.players);
 
     // Handle color sequence visibility
     if (data.roomType === 'basketball') {
@@ -346,6 +363,33 @@ function renderNewGame(data) {
         colorSequence.classList.remove('visible');
         colorSequence.classList.add('invisible');
     }
+}
+
+function renderPlayerData(playerData){
+    const container = document.getElementById('room-players')
+    container.innerHTML = ''
+
+    playerData.forEach((player) => {
+        const li = document.createElement('li')
+        li.classList.add('list-item')
+
+        // Create an image element for the avatar
+        const avatarImg = document.createElement('img');
+        avatarImg.src = player.playerAvatar;
+        avatarImg.alt = `${player.playerName || 'Unknown'}'s avatar`;
+        avatarImg.classList.add('avatar');
+
+        // Create a span for the player's details
+        const playerDetails = document.createElement('span');
+        playerDetails.textContent = `${player.playerName || 'Unknown'}`;
+
+        // Append avatar and details to the list item
+        li.appendChild(avatarImg);
+        li.appendChild(playerDetails);
+
+        // Append the list item to the container
+        container.appendChild(li);
+    })
 }
 
 function toggleContainers(showRoomMessage = false) {
@@ -430,6 +474,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'));
     const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
     const storedColors = localStorage.getItem('spanColors')
+    const storedUpdateLifesState = JSON.parse(localStorage.getItem('updateLifesState'));
 
     if (storedNewLevelStarts) {
         console.log('storedNewLevelStarts: ', storedNewLevelStarts)
@@ -456,16 +501,34 @@ window.addEventListener('DOMContentLoaded', () => {
         countdownElement.textContent = storedUpdatePrepTime
     }
 
-    if (storedUpdateLifes) {
-        console.log('storedUpdateLifes: ', storedUpdateLifes)
+    if (storedUpdateLifesState) {
+        if (!storedUpdateLifesState) return;
 
+        lifesContainer.innerHTML = '';
+
+        storedUpdateLifesState.forEach(state => {
+            const heart = document.createElement('div');
+            heart.classList.add(state === 'broken' ? 'heart-broken' : 'heart');
+            heart.innerHTML = state === 'broken' ? heartbreakSVG : heartSVG; 
+            lifesContainer.appendChild(heart);
+        })
+    }
+
+    /* if (storedUpdateLifes) {
         for (let i = 0; i < storedUpdateLifes; i++) {
-            const heart = hearts[i]
+            const heart = document.createElement('div');
+            heart.classList.add('heart');
             heart.innerHTML = heartSVG; // Insert the SVG directly
+            lifesContainer.appendChild(heart);
         }
+
+        const hearts = lifesContainer.querySelectorAll('.heart');
+
+        console.log('hearts length: ', hearts.length, ' storedUpdateLifes: ', storedUpdateLifes)
+
         // Remove extra hearts and replace with heartbreaks
         if (hearts.length > storedUpdateLifes) {
-            for (let i = storedUpdateLifes; i < hearts.length; i++) {
+            for (let i = storedUpdateLifes; i < 5; i++) {
                 const heart = hearts[i];
 
                 // Create the heartbreak element
@@ -479,7 +542,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-    }
+    } */
 
     if (storedPlayerScored) {
         console.log('storedPlayerScored: ', storedPlayerScored) 

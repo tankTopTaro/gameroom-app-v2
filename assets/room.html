@@ -15,11 +15,6 @@
                 <!-- First Section (lifes-container) -->
                 <div id="lifes-container" class="w-100 d-flex gap-2 align-items-center justify-content-center flex-grow-1">
                     <!-- Insert lifes content here -->
-                     <div class="heart"></div>
-                     <div class="heart"></div>
-                     <div class="heart"></div>
-                     <div class="heart"></div>
-                     <div class="heart"></div>
                 </div>
             
                 <!-- Second Section (countdown and score) -->
@@ -78,6 +73,11 @@
                 <div class="w-100 d-flex flex-column gap-2 align-items-center justify-content-center flex-grow-1">
                     <span id="room-info" class="fs-2"></span>
                 </div>
+
+                <!-- Third Section (room info) -->
+                <div class="w-100 d-flex flex-column gap-2 align-items-center justify-content-center flex-grow-1">
+                    <ul id="room-players" class="fs-2"></ul>
+                </div>
             </div>  
             
             <div id="player-message-container" class="w-100 h-100 d-none gap-2 align-items-center justify-content-center">
@@ -87,7 +87,7 @@
             <!-- Room Message Container -->
             <div class="room-message-container d-none flex-column align-items-center justify-content-center">
                 <span id="room-message" class="text-center py-4"></span>
-                <span id="choice-timer" class="text-center py-4"></span>
+                <!-- <span id="choice-timer" class="text-center py-4"></span>
                 <div class="d-flex align-items-a justify-content-center gap-4">
                     <div class="light-green d-flex justify-content-center align-items-center">
                         <button id="continue-button" class="btn outline-none text-white fs-2">Continue</button>
@@ -95,14 +95,14 @@
                     <div class="light-red d-flex justify-content-center align-items-center">
                         <button id="no-button" class="btn outline-none text-white fs-2">Exit</button>
                     </div>
-                </div>
+                </div> -->
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="js/room.js"></script>
-    <script>
+    <!-- <script>
         function animateLight() {
             const redlights = document.querySelectorAll(".light-red");
             redlights.forEach(light => {
@@ -126,6 +126,6 @@
         }
 
         let intervalId = window.setInterval(animateLight, 10)
-    </script>
+    </script> -->
 </body>
 </html>

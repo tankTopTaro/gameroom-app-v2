@@ -1,4 +1,4 @@
-const inputElement = document.getElementById('numberOfPlayers')
+/* const inputElement = document.getElementById('numberOfPlayers')
 const warningMessage = document.getElementById('warningMessage')
 const addPlayer = document.getElementById('addPlayer')
 
@@ -12,7 +12,9 @@ inputElement.addEventListener('input', () => {
     else {
         warningMessage.style.display = 'none'
     }
-})
+}) */
+
+const playerBtns = document.querySelectorAll('.add-player')
 
 function createPlayer() {
     // Create random ID number
@@ -57,7 +59,7 @@ async function scanPlayers(rfid, playerName, playerAvatar) {
     }
 }
 
-addPlayer.addEventListener('click', async () => {
+/* addPlayer.addEventListener('click', async () => {
     const numberOfPlayers = parseInt(inputElement.value, 10);
     const max = parseInt(inputElement.max, 10)
 
@@ -73,4 +75,16 @@ addPlayer.addEventListener('click', async () => {
         console.log('Adding player ${i + 1}: ', player);
         await scanPlayers(player.rfid, player.playerName, player.playerAvatar);
     }
+}) */
+
+playerBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const numberOfPlayers = parseInt(btn.getAttribute('data-number'), 10);
+
+        for (let i = 0; i < numberOfPlayers; i++) {
+            const player = createPlayer();
+            console.log('Adding player ${i + 1}: ', player);
+            await scanPlayers(player.rfid, player.playerName, player.playerAvatar);
+        }
+    })
 })

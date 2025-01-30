@@ -80,7 +80,6 @@
 /* General Styles */
 html, body {
     width: 100%;
-    overflow: hidden;
     background-color: var(--background-color);
 }
 
@@ -128,7 +127,7 @@ html, body {
 }
 
 /* Door list items */
-#players{
+#players {
     display: flex;
     flex-direction: column; /* Arrange items in a row */
     gap: 10px; /* Optional: Add spacing between items */
@@ -136,7 +135,7 @@ html, body {
     padding: 0; /* Remove default padding */
 }
 
-#players .list-item {   
+#room-players .list-item, #players .list-item {   
     display: flex; 
     align-items: center; 
     gap: 10px; 
@@ -148,15 +147,34 @@ html, body {
     width: 200px;
 }
 
-#players .avatar {
+#room-players .avatar, #players .avatar, #current-players .avatar, #next-players .avatar {
     width: 50px;  
     height: 50px; 
     object-fit: cover; 
 }
 
-#players span {
+#room-players span, #players span, #current-players span, #next-players span {
     color: #fff; 
     font-size: 14px; 
+}
+
+#room-players, #current-players, #next-players {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 items per row */
+    gap: 10px; /* Adjust spacing */
+    list-style: none;
+    padding: 0;
+}
+
+#room-players .list-item, #current-players .list-item, #next-players .list-item{
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    background-color: #222; 
+    padding: 10px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    width: 150px;
 }
 
 /* Initial Hidden State */
@@ -372,4 +390,23 @@ html, body {
       box-shadow: none;
     }
   }
-  
+
+@media (max-width: 1200px) {
+    #monitor {
+        flex-direction: column;
+    }
+
+    #monitor .col-8, #monitor .col-4 {
+        width: 100%;
+    }
+
+    #lists {
+        flex-direction: row;
+    }
+
+    #lists .col-6 {
+        flex: 0 0 100%;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+}

@@ -2,7 +2,9 @@ const lifesElement = document.getElementById('lifes')
 const statusElement = document.getElementById('status')
 const countdownElement = document.getElementById('countdown')
 const roomElement = document.getElementById('roomInfo')
-const container = document.getElementById('players')
+const currentPlayersElement = document.getElementById('current-players')
+const nextPlayersElement = document.getElementById('next-players')
+
 const canvas = document.getElementById('canvas1')
 const ctx = canvas.getContext('2d')
 
@@ -16,6 +18,9 @@ let bufferedLightUpdates = []
 let yellowDots = []
 let audioQueue = []
 let clearDotsInterval = undefined
+let currentPlayers = []
+let waitingPlayers = []
+let isGameOver = false
 
 // Give the canvas good size to avoid the default size of 300px which then streches and pixellizes
 
@@ -177,23 +182,47 @@ function startListenningToSocket(){
             console.log('Received a non-json message:', event.data)
         }
         if(json){
-            if(json.type === 'gameRequest'){
+            /**
+             * Add waiting players to the array
+             * use that array to display the players
+             * clear out the array when 'newLevelStarts' and 'gameEnded'
+             */
+            if(json.type === 'waitingGameRequest'){
                 console.log(json)
+                localStorage.setItem('waitingGameRequest', JSON.stringify(json.players))
+                waitingPlayers.push(json.players)
+                renderPlayerData(json.players, 'next-players')
             }
             if(json.type === 'newLevelStarts'){
                 let newGame = json
                 if(newGame){
                     localStorage.clear()
+                    waitingPlayers = []
                 }
 
                 localStorage.setItem('newLevelStarts', JSON.stringify(json))
                 
-                console.log('newLevelStarts: ', newGame)
-                lifesElement.textContent = newGame.lifes
-                statusElement.textContent = ''
-                roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
-
-                renderPlayerData(newGame.players)
+                if(isGameOver){
+                    setTimeout(() => {
+                        console.log('newLevelStarts: ', newGame)
+                        lifesElement.textContent = newGame.lifes
+                        statusElement.textContent = ''
+                        roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
+        
+                        renderPlayerData(newGame.players, 'current-players')
+                        //renderPlayerData(waitingPlayers, 'next-players')  
+                    }, 2000)
+                    isGameOver = false
+                } else {
+                    console.log('newLevelStarts: ', newGame)
+                    lifesElement.textContent = newGame.lifes
+                    statusElement.textContent = ''
+                    roomElement.textContent = 'Room: ' + newGame.roomType + ' Rule: ' + newGame.rule + ' Level: ' + newGame.level
+    
+                    renderPlayerData(newGame.players, 'current-players')
+                    //renderPlayerData(waitingPlayers, 'next-players')  
+                }
+                 
             }
             if(json.type === 'updateCountdown'){
                 let countdown = json.countdown
@@ -215,12 +244,12 @@ function startListenningToSocket(){
                 let lifes = json.lifes
 
                 localStorage.setItem('updateLifes', JSON.stringify(lifes))
-                //let audio = json.audio
+                let audio = json.audio
                 
                 console.log('updateLifes', lifes)
                 if (lifesElement) {
                     lifesElement.textContent = lifes.toString();
-                    //fetchAudio(audio)
+                    fetchAudio(audio)
                 }
                 
                 if(lifes === 0){
@@ -260,7 +289,7 @@ function startListenningToSocket(){
                 let color = json
                 
                 if (color) {
-                    //audioQueue.push(fetchAudio(color.name));
+                    audioQueue.push(fetchAudio(color.name));
                 }
             }
             if(json.type === 'colorNamesEnd'){
@@ -281,16 +310,16 @@ function startListenningToSocket(){
                 localStorage.setItem('playerScored', JSON.stringify(success))
 
                 console.log('playerScored', success)
-                renderPlayerData(json.players)
+                renderPlayerData(json.players, 'current-players')
                 if (success) {
-                    //fetchAudio(success.audio)
+                    fetchAudio(success.audio)
                 }
             }
             if(json.type === 'levelCompleted'){
                 let win = json
 
                 statusElement.textContent = win.message
-                //fetchAudio(win.audio)
+                fetchAudio(win.audio)
 
                 setTimeout(() => {
                     statusElement.textContent = ''
@@ -302,7 +331,7 @@ function startListenningToSocket(){
                 let lose = json
 
                 statusElement.textContent = lose.message
-                //fetchAudio(lose.audio)
+                fetchAudio(lose.audio)
 
                 setTimeout(() => {
                     statusElement.textContent = ''
@@ -315,18 +344,21 @@ function startListenningToSocket(){
                     clearInterval(clearDotsInterval);
                     clearDotsInterval = undefined
                 } */
+                isGameOver = true
                 resetMonitor()
-                localStorage.clear()
+                localStorage.clear()    
             }
             if(json.type === 'greenButtonPressed'){
                 const message = {'type': 'continue'};
                 socket.send(JSON.stringify(message))
             }
-            
+            if(json.type === 'noMoreLifes'){
+                isGameOver = true
+            }
             if(json.type === 'offerSameLevel'){}
             if(json.type === 'offerNextLevel'){}
             if(json.type === 'timeIsUp'){}
-            if(json.type === 'noMoreLifes'){}
+            
             if(json.type === 'scannedRfid'){}
             if(json.type === 'gameRequest'){}
             if(json.type === 'playerFailed'){}
@@ -392,7 +424,8 @@ function resetMonitor() {
     countdownElement.textContent = '00:00'
     statusElement.textContent = ''
     roomElement.textContent = ''
-    players.innerHTML = ''
+    currentPlayersElement.innerHTML = ''
+    nextPlayersElement.innerHTML = ''
 }
 
 function clearDots(x, y, radius) {
@@ -415,7 +448,8 @@ function clearDots(x, y, radius) {
     ctx.restore();
 }
 
-function renderPlayerData(playerData){
+function renderPlayerData(playerData, containerId){
+    const container = document.getElementById(containerId)
     container.innerHTML = ''
 
     playerData.forEach((player) => {
@@ -480,12 +514,17 @@ if(clearDotsInterval){
 
 clearDotsInterval = setInterval(clearAndDrawRoom, 4000)
 
+/**
+ * Figure out a way to clear localStorage on page first load
+ */
+
 window.addEventListener('DOMContentLoaded', () => {
     const storedNewLevelStarts = JSON.parse(localStorage.getItem('newLevelStarts'));
     const storedUpdateCountdown = JSON.parse(localStorage.getItem('updateCountdown'));
     const storedUpdatePrepTime = JSON.parse(localStorage.getItem('updatePrepTime'));
     const storedUpdateLifes = JSON.parse(localStorage.getItem('updateLifes'));
     const storedPlayerScored = JSON.parse(localStorage.getItem('playerScored'));
+    const storedWaitingGameRequest = JSON.parse(localStorage.getItem('waitingGameRequest'))
 
     if (storedNewLevelStarts) {
         console.log('storedNewLevelStarts: ', storedNewLevelStarts)
@@ -493,7 +532,11 @@ window.addEventListener('DOMContentLoaded', () => {
         statusElement.textContent = ''
         roomElement.textContent = 'Room: ' + storedNewLevelStarts.roomType + ' Rule: ' + storedNewLevelStarts.rule + ' Level: ' + storedNewLevelStarts.level
 
-        renderPlayerData(storedNewLevelStarts.players)
+        renderPlayerData(storedNewLevelStarts.players, 'current-players')
+    }
+
+    if(storedWaitingGameRequest){
+        renderPlayerData(storedWaitingGameRequest, 'next-players')
     }
 
     if (storedUpdateCountdown) {
@@ -513,7 +556,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (storedPlayerScored) {
         console.log('storedPlayerScored: ', storedPlayerScored)   
-        renderPlayerData(storedPlayerScored.players)     
+        renderPlayerData(storedPlayerScored.players, 'current-players')     
     }
 })
 

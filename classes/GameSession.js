@@ -264,7 +264,15 @@ class GameSession{
                     this.shapes.push(new Shape(150,150, 'rectangle',150,150, [255,0,0], 'report',  pathDots, 0.01, 'mainFloor'))
                     
                     // Safe Zone
-                    this.shapes.push(new Shape(320,320, 'rectangle',560,90, [0,255,0], 'report',  safeDots, 0, 'mainFloor'))
+                    /**
+                     * Inspecting the Messages from the server
+                     * I found that the green lights are only sent once
+                     * It does not update when the game is running
+                     * But setting the green lights onclick events to 'ignore' might be a good idea
+                     * Since we don't really need to report if a player touch the green lights
+                     */
+
+                    this.shapes.push(new Shape(320,320, 'rectangle',560,90, [0,255,0], 'ignore',  safeDots, 0, 'mainFloor'))
                 }
             }
             else{
@@ -928,7 +936,7 @@ class GameSession{
         // TODO : propose same level with countdown and push a button to accept
         let message = {
             'type': 'offerSameLevel',
-            'message': 'Game Over! press the Green Button to play again or exit',
+            'message': 'Game Over! Press the green button to play again or exit the room',
             'countdown': this.prepTime 
         }
         this.room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1044,10 +1052,11 @@ class GameSession{
         }
         this.room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
         this.room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
-        
+        this.room.socketForDoor.broadcastMessage(JSON.stringify(messageForRoom))
         this.reset()
         this.room.isFree = true
        if(this.room.waitingGameSession !== undefined){
+            console.log(this.room.waitingGameSession.players)
             this.room.currentGameSession = this.room.waitingGameSession
             this.room.waitingGameSession = undefined
 
@@ -1055,7 +1064,7 @@ class GameSession{
             let message = {
                 'type': 'gameRequest',
                 'message': 'Please enter the room',
-                'players': this.room.players
+                'players': this.room.currentGameSession.players
             };
             this.room.socketForDoor.broadcastMessage(JSON.stringify(message));
             await this.room.currentGameSession.init()

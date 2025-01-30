@@ -8,6 +8,8 @@ const rocket = `<svg  xmlns="http://www.w3.org/2000/svg"  width="100"  height="1
 let selectedLevelBtn = null
 let selectedLevelValue = null
 
+let players = []
+
 function startListenningToSocket(){
     let socket = new WebSocket('ws://' + window.location.hostname + ':8082');
 
@@ -53,7 +55,7 @@ function startListenningToSocket(){
                 }
                 renderDoor(json)
             }
-            if(json.type === 'waitingGameSession'){
+            if(json.type === 'waitingGameRequest'){
                 console.log(json)
                 // Clear previous message
                 doorMessage.innerHTML = ''
@@ -77,8 +79,6 @@ function startListenningToSocket(){
                 }, 5000)
             }
             if(json.type === 'gameRequest'){
-                console.log(json)
-
                 // Clear previous message
                 doorMessage.innerHTML = ''
 
@@ -88,6 +88,46 @@ function startListenningToSocket(){
                 message.classList.add('text-center')
                 message.textContent = json.message
                 doorMessage.appendChild(message)
+
+                // Create player list
+                const playerList = document.createElement('ul');
+                playerList.id = 'room-players';
+                playerList.classList.add('list-unstyled', 'text-center', 'mt-3'); // Bootstrap styling
+
+                json.players.forEach((player) => {
+                    const li = document.createElement('li')
+                    li.classList.add('list-item')
+            
+                    // Create an image element for the avatar
+                    const avatarImg = document.createElement('img');
+                    avatarImg.src = player.playerAvatar;
+                    avatarImg.alt = `${player.playerName || 'Unknown'}'s avatar`;
+                    avatarImg.classList.add('avatar');
+            
+                    // Create a container for players info
+                    const playerInfo = document.createElement('div');
+                    playerInfo.classList.add('d-flex');
+                    playerInfo.classList.add('flex-column');
+                    playerInfo.classList.add('align-items-start');
+            
+                    // Create a span for the player's details
+                    const playerDetails = document.createElement('span');
+                    playerDetails.textContent = `${player.playerName || 'Unknown'}`;        
+            
+                    // Append player details and score to the player info container
+                    playerInfo.appendChild(playerDetails);
+            
+                    // Append avatar and info to the list item
+                    li.appendChild(avatarImg);
+                    li.appendChild(playerInfo);
+            
+                    // Append the list item to the container
+                    playerList.appendChild(li);
+            
+                    playerList.offsetHeight; // Force reflow
+                })
+
+                doorMessage.appendChild(playerList)
 
                 // Ensure visibility
                 doorMessage.classList.remove('d-none');
@@ -104,24 +144,6 @@ function startListenningToSocket(){
                 console.log(json.message)
                 // Clear previous message
                 doorMessage.innerHTML = ''
-
-                // Add new message
-                const message = document.createElement('h1')
-                message.classList.add('text-white')
-                message.classList.add('text-center')
-                message.textContent = json.message
-                doorMessage.appendChild(message)
-
-                // Ensure visibility
-                doorMessage.classList.remove('d-none');
-                doorMessage.classList.add('d-flex');
-
-                // Clear message after 5 seconds
-                setTimeout(() => {
-                    doorMessage.innerHTML = ''
-                    doorMessage.classList.remove('d-flex')
-                    doorMessage.classList.add('d-none')
-                }, 5000)
             }
         }
     });

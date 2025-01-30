@@ -122,14 +122,17 @@ class Room{
             const { id } = req.params;
             const { playerName, playerAvatar } = req.body;
 
+
+            // this will block scanning when 
+            // there is a waiting game session
             if(this.waitingGameSession !== undefined) {
-                let message = {
+                /* let message = {
                     'type': 'waitingGameSession',
                     'message': 'Please wait for a moment'
                 }
 
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
-                this.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                this.socketForMonitor.broadcastMessage(JSON.stringify(message)) */
 
                 return res.json({
                     message: 'A game session is currently waiting. Player scan is blocked.'
@@ -161,17 +164,19 @@ class Room{
         });
         this.server.get('/game/request', async (req, res) => {
             console.log('/game/request', req.query);
-            let message = {
-                'type': 'gameRequest',
-                'message': 'Please enter the room',
-                'players': this.players
-            }
-            this.socketForMonitor.broadcastMessage(JSON.stringify(message))
-            this.socketForDoor.broadcastMessage(JSON.stringify(message))
 
             if(this.isFree){
                 this.currentGameSession = new GameSession(req.query.rule, req.query.level, this, this.type)
                 this.currentGameSession.players = [...this.players]   // this should lock the players to this session
+
+                let message = {
+                    'type': 'gameRequest',
+                    'message': 'Please enter the room',
+                    'players': this.currentGameSession.players
+                }
+                this.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                this.socketForDoor.broadcastMessage(JSON.stringify(message))
+
                 this.players = []
                 let gameSessionInitialized = await this.currentGameSession.init()
                 if(gameSessionInitialized === true){
@@ -187,12 +192,14 @@ class Room{
                 this.waitingGameSession.players = [...this.players]
 
                 let message = {
-                    'type': 'gameRequest',
+                    'type': 'waitingGameRequest',
                     'message': 'Please wait for a moment',
-                    'players': this.players
+                    'players': this.waitingGameSession.players
                 }
 
                 this.socketForDoor.broadcastMessage(JSON.stringify(message))
+                this.socketForMonitor.broadcastMessage(JSON.stringify(message))
+
                 this.players = []
                 res.send('<html><body><h1>Please wait</h1></body></html>');
             }
@@ -248,7 +255,6 @@ class Room{
     }
 
     sendLightsInstructionsIfIdle(){
-
         if(this.sendLightsInstructionsIsBusy){
             if(this.sendLightsInstructionsRequestIsPending){
                 console.log('WARNING : Animation frame LOST ! (received sendLightsInstructionsIfIdle while sendLightsInstructionsRequestIsPending Already)')
